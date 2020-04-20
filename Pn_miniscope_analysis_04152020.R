@@ -75,7 +75,7 @@ t_stim_m3_d3 <- c(1885, 2516)
 t_stim_m3_d4 <- c(1813,3587)
 t_stim_m3_d5 <- c(758) 
 t_stim_m3_d6 <- c(132,507) 
-t_stim_m3_d7 <- c(346) ## use first two 346, 1206, 1756, 2288
+t_stim_m3_d7 <- c(346) ## use first two 346, 1206, 1756, 2288, 2970, 3262, 3942
 
 t_stim_m3 <- list(t_stim_m3_d1, t_stim_m3_d2, t_stim_m3_d3, t_stim_m3_d4, t_stim_m3_d5, t_stim_m3_d6, t_stim_m3_d7)
 
@@ -163,6 +163,9 @@ score_range <- range(mapply(function(x) x$value, dat_cell_trace_re, SIMPLIFY = T
 
 for (i in c(3, 6, 7)) {
   dat_trace <- dat_cell_trace_re[[i]]
+  dat_trace_sta <- ddply(dat_trace, .(variable, Group), summarise,mean=mean(value), sum=sum(value))
+  dat_trace_sta <- dat_trace_sta[order(dat_trace_sta[,'mean']),]
+  dat_trace$variable <- factor(dat_trace$variable, levels = dat_trace_sta$variable)
   p_heat <- ggplot(dat_trace, aes(Time, variable,fill= value))+ 
     geom_tile(height=2)+
     facet_grid(rows = vars(Group), scales = "free_y")+
@@ -186,6 +189,10 @@ for (i in c(3, 6, 7)) {
 ## combine the heat plot
 p_heat_com <- plot_grid(p_heat_d3, p_heat_d6, p_heat_d7, nrow = 1)
 
+setwd("~cchen2/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_anti_heat.pdf", width = 150/25.6, height = 65/25.6, family = "Arial")
+p_heat_com
+dev.off()
 ## plot trace by group-----
 dat_cell_trace_pre_sta <- ddply(rbind(dat_cell_trace_re[[2]],dat_cell_trace_re[[3]]), .(Time, Group), summarise,n=length(value),mean=mean(value),sd=sd(value),se=sd(value)/sqrt(length(value)))
 dat_cell_trace_con_sta <- ddply(rbind(dat_cell_trace_re[[5]], dat_cell_trace_re[[6]]), .(Time, Group), summarise,n=length(value),mean=mean(value),sd=sd(value),se=sd(value)/sqrt(length(value)))
@@ -665,3 +672,19 @@ setwd("~cchen2/Documents/neuroscience/Pn\ project/Figure/PDF/")
 cairo_pdf("p_cov_bar.pdf", width = 82/25.6, height = 65/25.6, family = "Arial")
 p_cov_bar
 dev.off()
+
+
+## catalog each cells and export for plot in matlab----
+cc_cat_cells <- function(path_trace){
+  dat_trace <- read.xlsx(path_trace, colNames = F, rowNames = F)
+  ## choose the valid cell position
+  cell_valid <- dat_trace[,1]
+  dat_cell_cat <- subset(dat_cell_trace_re[[7]], dat_cell_trace_re[[7]]$ID == "m3"&dat_cell_trace_re[[7]]$Time=="0")$Group
+  cell_valid[cell_valid==1] = dat_cell_cat
+  return(cell_valid)
+}
+
+# for m3
+path_trace_m3 <- as.list(list.files(path ="~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m3/trace_days/", pattern = "*.xlsx", full.names = T ))
+
+write.csv(cell_valid, "m3_cells_cat_d7.csv", row.names = F)
