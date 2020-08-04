@@ -9,6 +9,7 @@
 ## updated: 04142020, do k-mean analysis firstly and back cat the cells activation
 ## updated: 05062020, only analyze the first across 
 ## updated:05112020, add code for ctrl experiment (mouse in homecage)
+## updated: 05222020, calculate the spiking frequency before and after crossing
 
 ## import needed library-----
 library("reshape2")
@@ -22,21 +23,25 @@ library(tidyverse)
 library(corrplot)
 library(scales)
 library(ggcorrplot)
+library(magrittr)
+library(zoo)
+library(pracma)
 
-
-
+## function for analysis-----
 c_miniscope_matlab <- function(ID_trace, t_stim) {
   ## import and format the data
-  dat_trace <- read.xlsx(ID_trace, colNames = F, rowNames = F)
-  ## analyze the trace
-  dat_trace<- dat_trace[dat_trace[,1]==1, ]
-  dat_trace<- as.data.frame(t(dat_trace[,-c(1, 2)]))
+  dat_trace <- read.xlsx(ID_trace, colNames = F, rowNames = F) %>% 
+    filter(., X1 ==1) %>% 
+    select(., -c(1,2)) %>% 
+    t() %>% 
+    as.data.frame()
+    
   rownames(dat_trace) <- NULL
   colnames(dat_trace)<- NULL
   ## do z score of the whole trace
   dat_trace <- apply(dat_trace, 2, scale)
   
-  ## divide ca2+ trace within -5 and 9s before and after stimuls, take -5 to -3 as baseline
+  ## divide ca2+ trace within -2 and 6s before and after stimuls, take -2 to 0 as baseline
   dat_stim <- vector(mode = "list", length = length(t_stim))
   #stim_time<- seq(-5, 8.5, by=0.5)
   stim_time<- seq(-2, 6.5, by=0.5)
@@ -46,15 +51,12 @@ c_miniscope_matlab <- function(ID_trace, t_stim) {
   ## extract cell activity when they cross the border
   for (i in seq_along(t_stim)){
     t1_p <- t_stim[i]
-    dat_stim1 <- dat_trace[(t1_p-40):(t1_p+140-1),]
-    #dat_stim1 <- apply(dat_stim1, 2, scale)
+    dat_stim1 <- dat_trace[(t1_p-40):(t1_p+140-1),] 
     dat_stim1 <- aggregate(dat_stim1,list(rep(1:(nrow(dat_stim1)%/%n+1),each=n,len=nrow(dat_stim1))),mean)[-1]
-    dat_stim1_base <- dat_stim1[1:5,] ## baseline as -5 to -3
-    dat_stim1_base_mean <- colMeans(dat_stim1_base, na.rm = T)
-    dat_stim1_nor1 <- sweep(dat_stim1, 2, dat_stim1_base_mean, FUN = "-")
-    rownames(dat_stim1_nor1) <- NULL
-    colnames(dat_stim1_nor1)<- NULL
-    dat_stim[[i]] <- dat_stim1_nor1
+    
+    dat_stim[[i]] <- dat_stim1[1:5,] %>%  ## baseline as -2 to 0
+      colMeans(., na.rm = T) %>% 
+      sweep(dat_stim1, 2, ., FUN = "-")
   }
   
   ## average the trace by cell number
@@ -126,11 +128,25 @@ t_stim_m18 <- list(t_stim_m18_d1, t_stim_m18_d2, t_stim_m18_d3, t_stim_m18_d4, t
 
 dat_trace_m18 <- mapply(c_miniscope_matlab, path_trace_m18, t_stim_m18, SIMPLIFY = F)
 
+# for m855
+path_trace_m855 <- as.list(list.files(path ="~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m855/trace_days", pattern = "*.xlsx", full.names = T ))
+t_stim_m855_d1 <- c(223)*2
+t_stim_m855_d2 <- c(513)*2
+t_stim_m855_d3 <- c(392) *2
+t_stim_m855_d4 <- c(550)*2
+t_stim_m855_d5 <- c(67)*2 
+t_stim_m855_d6 <- c(64) *2
+t_stim_m855_d7 <- c(41)*2
+
+t_stim_m855 <- list(t_stim_m855_d1, t_stim_m855_d2, t_stim_m855_d3, t_stim_m855_d4, t_stim_m855_d5, t_stim_m855_d6, t_stim_m855_d7)
+
+dat_trace_m855 <- mapply(c_miniscope_matlab, path_trace_m855, t_stim_m855, SIMPLIFY = F)
+
 ## combine data and do k-means analysis-----
 
 dat_cell_trace <- vector(mode = "list", 7)
 for (i in 1:7) {
-  dat_cell_trace[[i]] <- cbind(dat_trace_m3[[i]], dat_trace_m7[[i]], dat_trace_m17[[i]], dat_trace_m18[[i]] )
+  dat_cell_trace[[i]] <- cbind(dat_trace_m3[[i]], dat_trace_m7[[i]], dat_trace_m17[[i]], dat_trace_m18[[i]], dat_trace_m855[[i]])
 
 }
 
@@ -138,7 +154,7 @@ for (i in 1:7) {
 dat_cell_trace_re <- vector(mode = "list", 7)
 
 # k-menas clustering
-mouse_ID <- c("m3", "m7", "m17", "m18")
+mouse_ID <- c("m3", "m7", "m17", "m18", "m855")
 for (i in 1:length(dat_cell_trace)) {
   dat_cell_trace_d <- dat_cell_trace[[i]]
   cell_id <- sprintf("Cell%s",seq(1:ncol(dat_cell_trace_d)))
@@ -160,7 +176,7 @@ for (i in 1:length(dat_cell_trace)) {
   dat_cell_trace_d_re$Group[dat_cell_trace_d_re$Group == dat_cell_d_sort[2]] ="Neutral"
   dat_cell_trace_d_re$Group[dat_cell_trace_d_re$Group == dat_cell_d_sort[3]] ="Inhibited"
   
-  rep_time <- c(ncol(dat_trace_m3[[i]]), ncol(dat_trace_m7[[i]]), ncol(dat_trace_m17[[i]]), ncol(dat_trace_m18[[i]]))
+  rep_time <- c(ncol(dat_trace_m3[[i]]), ncol(dat_trace_m7[[i]]), ncol(dat_trace_m17[[i]]), ncol(dat_trace_m18[[i]]), ncol(dat_trace_m855[[i]]) )
   dat_cell_trace_d_re <- mutate(dat_cell_trace_d_re, Group= factor(Group, levels = c("Excited", "Neutral", "Inhibited"))) %>% 
     mutate(., ID = rep(mouse_ID, rep_time*length(stim_time)) )
 
@@ -179,7 +195,7 @@ for (i in c(3, 6, 7)) {
   dat_trace$variable <- factor(dat_trace$variable, levels = dat_trace_sta$variable)
   p_heat <- ggplot(dat_trace, aes(Time, variable,fill= value))+ 
     geom_tile(height=2)+
-    facet_grid(rows = vars(Group), scales = "free_y")+
+    #facet_grid(rows = vars(Group), scales = "free_y")+
     #scale_fill_gradient2(limits= score_range,low = "navy", high = "red4", mid = "white")+
     scale_fill_gradientn(limits= score_range, colours = c("navy", "white", "red4"), values = rescale(c(score_range[1], 0, score_range[2])))+
     labs(x="Time relative to crossing (s)", y="Number of cells")+
@@ -267,7 +283,8 @@ dat_cell_cor$Day <- factor(dat_cell_cor$Day, levels = c("Pre", "Cond.", "Test"))
 p_trace_cor <- ggplot(dat_cell_cor, aes(Excited, Inhibited, colour=Day))+
   geom_point()+
   geom_smooth(method = "lm", lwd=0.8)+
-  scale_colour_manual(values=c("seagreen", "indianred", "deepskyblue4"))+  labs(x="Excited (z-score)", y="Inhibited (z-score)")+
+  scale_colour_manual(values=c("seagreen", "indianred", "deepskyblue4"))+  
+  labs(x="Excited (z-score)", y="Inhibited (z-score)")+
   theme(axis.line.x = element_line(),
         axis.line.y = element_line(),
         panel.grid.major = element_blank(),
@@ -286,7 +303,7 @@ dat_cell_trace_cor <- NULL
 cell_area_day <- c("Rm","Pre", "Pre", "Rm","Cond.","Cond.", "Test")
 for (i in c(2,3,5,6,7)){
   dat_trace_cor <- dat_cell_trace_re[[i]] %>%
-    ddply(., .(ID, Time, Group), summarise, value=mean(value)) %>%
+    ddply(., .(ID, Time, Group), summarise, value=mean(value,na.rm = T)) %>%
     subset(., .$Group!="Neutral") %>%
     dcast(., Time + ID ~ Group) %>%
     ddply(., .(ID), summarise, "corr" = cor(Excited, Inhibited, method = "spearman")) %>%
@@ -319,8 +336,9 @@ dev.off()
   
 ## calculate the sum of active and inhibited trace----
 dat_cell_trace_sum <- rbind(dat_cell_trace_pre_sta, dat_cell_trace_con_sta, dat_cell_trace_test_sta) %>%
+  as_tibble() %>% 
+  mutate(Day = rep(c("Pre", "Cond.", "Test"), c(nrow(dat_cell_trace_pre_sta),nrow(dat_cell_trace_con_sta),nrow(dat_cell_trace_test_sta)))) %>%
   subset(., .$Group!="Neutral") %>%
-  mutate( Day = rep(c("Pre", "Cond.", "Test"), each= length(stim_time)*2*length(mouse_ID))) %>%
   ddply(., .(ID,Time, Day), summarise, value=sum(value)) %>%
   ddply(., .(Time, Day), summarise,n=length(value),mean=mean(value),sd=sd(value),se=sd(value)/sqrt(length(value))) %>%
   mutate(Day = factor(Day, levels = c("Pre", "Cond.", "Test")))
@@ -350,7 +368,7 @@ dev.off()
 dat_cell_area <- c()
 cell_area_day <- c("Rm","Pre", "Pre", "Rm","Cond.","Cond.", "Test")
 for (i in c(2,3,5,6,7)){
-  rep_time <- c(ncol(dat_trace_m3[[i]]), ncol(dat_trace_m7[[i]]), ncol(dat_trace_m17[[i]]), ncol(dat_trace_m18[[i]]))
+  rep_time <- c(ncol(dat_trace_m3[[i]]), ncol(dat_trace_m7[[i]]), ncol(dat_trace_m17[[i]]), ncol(dat_trace_m18[[i]]), ncol(dat_trace_m855[[i]]))
   dat_trace <- dat_cell_trace_re[[i]]
   dat_trace$ID <- rep(mouse_ID, rep_time*length(stim_time))
   dat_trace_sta <- ddply(dat_trace, .(ID, Time, Group), summarise,n=length(value),mean=mean(value),sd=sd(value),se=sd(value)/sqrt(length(value)))
@@ -381,14 +399,23 @@ p_EI_ratio <- ggplot(dat_cell_area_sta, aes(Day, value, fill=Day))+
         panel.background = element_blank(),
         axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
   scale_y_continuous(limits = c(0, 4), expand = c(0,0))+
-  theme(legend.title = element_blank(), legend.position = "none")
+  theme(legend.title = element_blank(), legend.position = "none")+
+  annotate(x=c(1,1,2,2), y=c(3.4,3.5,3.5,3.4),"path")+
+  annotate("text",x=1.5,y=3.5, label="***", size=5)
+
+
+## statistic test
+t_EI<-aov(value~Day, data=dat_cell_area_sta)
+summary(t_EI)
+pairwise.t.test(dat_cell_area_sta$value, dat_cell_area_sta$Day, paired = T)
+
 
 setwd("~cchen2/Documents/neuroscience/Pn\ project/Figure/PDF/")
 cairo_pdf("p_EI_ratio.pdf", width = 40/25.6, height = 65/25.6, family = "Arial")
 p_EI_ratio
 dev.off() 
 ## plot the sum of E-I----
-dat_cell_sum_sta <-  ddply(dat_cell_area, .(ID, Day), summarise, "sum"=mean(sum, na.rm = T))
+dat_cell_sum_sta <-  ddply(dat_cell_area, .(ID, Day), summarise, "sum"= mean(sum, na.rm = T))
 
 
 p_EI_sum<- ggplot(dat_cell_sum_sta, aes(Day, sum, fill=Day))+
@@ -404,7 +431,15 @@ p_EI_sum<- ggplot(dat_cell_sum_sta, aes(Day, sum, fill=Day))+
         panel.background = element_blank(),
         axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
   #scale_y_continuous(limits = c(0, 10), expand = c(0,0))+
-  theme(legend.title = element_blank(), legend.position = "none")
+  theme(legend.title = element_blank(), legend.position = "none")+
+  annotate(x=c(1,1,2,2), y=c(9,9.1,9.1,9),"path")+
+  annotate("text",x=1.5,y=9.1, label="*", size=5)
+  
+
+## statistic test
+t_sum_EI<-aov(sum~Day, data=dat_cell_sum_sta)
+summary(t_EI)
+pairwise.t.test(dat_cell_sum_sta$sum, dat_cell_sum_sta$Day, paired = T)
 
 ## show the change of E, I and sum
 p_EIS_change <- dat_cell_area %>%
@@ -463,6 +498,73 @@ setwd("~cchen2/Documents/neuroscience/Pn\ project/Figure/PDF/")
 cairo_pdf("p_cat.pdf", width = 70/25.6, height = 72/25.6, family = "Arial")
 p_cat
 dev.off()
+
+## calculate the spikes before and after crossing------
+cc_firing_fun <- function(path_trace, path_peak, t_stim) {
+  cell_valid <- read.xlsx(path_trace, colNames = F, rowNames = F) %>% 
+    select (., X1)
+  
+  dat_peak <- read.csv(path_peak) %>% 
+    select(which(cell_valid==1)) %>% 
+    unlist() %>% 
+    na.omit()
+  
+  ctrl_rang <- range(t_stim-40, t_stim)
+  test_rang <- range(t_stim, t_stim +80)
+  
+  ctrl_freq <- length(dat_peak[dat_peak>= ctrl_rang[1] & dat_peak < ctrl_rang[2]])/2 # 2s before crossing
+  test_freq <- length(dat_peak[dat_peak>= test_rang[1] & dat_peak < test_rang[2]])/4 # 4s after crossing
+  return(c(ctrl_freq, test_freq))
+}
+
+## for m3
+
+path_peak_m3 <- as.list(list.files(path ="~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m3/peaks_days/", pattern = "*.csv", full.names = T ))
+
+dat_rate_m3 <- t(mapply(cc_firing_fun, path_trace_m3, path_peak_m3, t_stim_m3))
+
+## for m7
+path_peak_m7 <- as.list(list.files(path ="~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m7/peaks_days/", pattern = "*.csv", full.names = T ))
+
+dat_rate_m7 <- t(mapply(cc_firing_fun, path_trace_m7, path_peak_m7, t_stim_m7))
+
+## for m17
+path_peak_m17 <- as.list(list.files(path ="~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m17/peaks_days/", pattern = "*.csv", full.names = T ))
+dat_rate_m17 <- t(mapply(cc_firing_fun, path_trace_m17, path_peak_m17, t_stim_m17))
+
+## for m18
+path_peak_m18 <- as.list(list.files(path ="~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m18/peaks_days/", pattern = "*.csv", full.names = T ))
+
+dat_rate_m18 <- t(mapply(cc_firing_fun, path_trace_m18, path_peak_m18, t_stim_m18))
+
+## combine data and plot
+dat_firing <- rbind(dat_rate_m3, dat_rate_m7, dat_rate_m17, dat_rate_m18) %>% 
+  as_tibble() %>% 
+  rename(Freq_before = V1, Freq_after = V2) %>% 
+  mutate(Day = rep(str_c("D", 1:7), 4)) %>% 
+  mutate(ID = rep(mouse_ID, each=7)) %>% 
+  mutate(Group = rep(cell_area_day, 4)) %>% 
+  filter(Group != "Rm") %>% 
+  gather(variable, value, -ID, -Day, -Group) %>% 
+  ddply(., .(ID, Group, variable, Day), summarise, value=mean(value)) %>% 
+  ddply(., .(ID, Group, variable), summarise, value=mean(value)) %>% 
+  mutate(Group= factor(Group, levels = c("Pre", "Cond.", "Test")), 
+         variable=factor(variable, levels = c("Freq_before", "Freq_after")))
+
+p_firing <- ggplot(dat_firing, aes(Group, value, fill=variable))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_jitter(position=position_jitterdodge(), shape=1, size=1)+
+  scale_fill_manual(values=c("seagreen", "indianred"))+
+  labs(x="", y="Firing rate (Hz)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  # scale_y_continuous(limits = c(0,3),expand = c(0,0))+
+  theme(legend.title = element_blank(), legend.position = "top")
 
 ## within and cross cells distance-----
 ## function to trim cell position file with the manually confirmed cells
@@ -1082,3 +1184,201 @@ setwd("~cchen2/Documents/neuroscience/Pn\ project/Figure/PDF/")
 cairo_pdf("p_ctrl_com.pdf", width = 170/25.6, height = 62/25.6, family = "Arial")
 p_ctrl_combine
 dev.off()
+
+## for pin prick-------
+path_m3_pin <- "~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m3/pin_prick/m3_trace_pinprick.xlsx"
+t_pin_m3 <- c(337,665,916,1303,1541,1767,2032,2277,2496,2824)
+
+dat_pin_m3 <-cc_miniscope_matlab(path_m3_pin, t_pin_m3)
+
+## for m7
+path_m7_pin <- "~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m7/pin_prick/m7_trace_pinprick.xlsx"
+t_pin_m7 <- c(493, 1323, 1867, 2415, 3035, 3556, 4079, 4519, 5020, 5517) 
+
+dat_pin_m7 <-cc_miniscope_matlab(path_m7_pin, t_pin_m7)
+
+dat_cell_trace <- vector(mode = "list", length = length(t_pin_m3))
+for (i in 1:length(t_pin_m3)) {
+  dat_cell_trace[[i]] <- cbind(dat_pin_m3[[i]], dat_pin_m7[[i]] )
+  
+}
+
+
+dat_cell_trace_re <- vector(mode = "list", length = length(t_pin_m3))
+
+# k-means clustering
+mouse_ID_pin <- c("m3", "m7")
+for (i in 1:length(dat_cell_trace)) {
+  dat_cell_trace_d <- dat_cell_trace[[i]]
+  cell_id <- sprintf("Cell%s",seq(1:ncol(dat_cell_trace_d)))
+  colnames(dat_cell_trace_d)<- cell_id
+  
+  dat_cell_trace_d_cluster <- unname(kmeans(t(dat_cell_trace_d), centers = 3, nstart = 20)[[1]])
+  stim_time<- seq(-2, 6.5, by=0.5)
+  #stim_time<- seq(-5, 8.5, by=0.5)
+  
+  dat_cell_trace_d_re<- as.data.frame(dat_cell_trace_d) %>% 
+    mutate(., Time= stim_time) %>% 
+    melt(., id.vars='Time') %>% 
+    mutate(., Group= rep(dat_cell_trace_d_cluster, each=length(stim_time)) )
+  
+  ## sort data by the value in each group
+  dat_cell_d_sort <- as.numeric(names(sort(tapply(dat_cell_trace_d_re$value, dat_cell_trace_d_re$Group, mean), decreasing = T)))
+  
+  dat_cell_trace_d_re$Group[dat_cell_trace_d_re$Group == dat_cell_d_sort[1]] ="Excited"
+  dat_cell_trace_d_re$Group[dat_cell_trace_d_re$Group == dat_cell_d_sort[2]] ="Neutral"
+  dat_cell_trace_d_re$Group[dat_cell_trace_d_re$Group == dat_cell_d_sort[3]] ="Inhibited"
+  
+  rep_time <- c(ncol(dat_pin_m3[[i]]), ncol(dat_pin_m7[[i]]))
+  dat_cell_trace_d_re <- mutate(dat_cell_trace_d_re, Group= factor(Group, levels = c("Excited", "Neutral", "Inhibited"))) %>% 
+    mutate(., ID = rep(mouse_ID_pin, rep_time*length(stim_time)) )
+  
+  dat_cell_trace_re[[i]] <- dat_cell_trace_d_re
+}
+
+## plot trace by group
+dat_cell_pin_sta <- mapply(function (x) ddply(x, .(ID,Time, Group), summarise,value=mean(value)), dat_cell_trace_re, SIMPLIFY = F) %>% 
+  do.call(rbind, .) %>% 
+  ddply(., .(ID,Time, Group), summarise,value=mean(value)) %>% 
+  mutate(Group = factor(Group, levels = c("Neutral", "Excited", "Inhibited")))
+
+
+
+
+## group by day
+p_trace <- ddply(dat_cell_pin_sta, .(Time, Group), summarise,n=length(value),mean=mean(value),sd=sd(value),se=sd(value)/sqrt(length(value))) %>% 
+  ggplot(., aes(Time, mean, colour=Group))+
+  geom_line()+
+  geom_ribbon(aes(ymin=mean-se, ymax=mean+se, fill=Group), alpha=0.1, linetype=0)+
+  scale_colour_manual(values=c("#999999", "darkred", "navy"))+
+  scale_fill_manual(values=c("#999999", "darkred", "navy"))+
+  labs(x="Time relative to crossing (s)", y="Z score")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  geom_vline(xintercept = 0, col= 'red', linetype=2)+
+  theme(legend.title = element_blank(), legend.position = 'none')
+
+
+
+## calculate the sum of active and inhibited trace
+p_trace_sum <- filter(dat_cell_pin_sta, Group!="Neutral") %>%
+  ddply(., .(ID,Time), summarise, value=sum(value)) %>%
+  ddply(., .(Time), summarise,n=length(value),mean=mean(value),sd=sd(value),se=sd(value)/sqrt(length(value))) %>% 
+  ggplot(., aes(Time, mean))+
+  geom_line()+
+  geom_ribbon(aes(ymin=mean-se, ymax=mean+se), alpha=0.1, linetype=0)+
+  labs(x="Time relative to crossing (s)", y="AUC (z score)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  geom_vline(xintercept = 0, col= 'red', linetype=2)+
+  theme(legend.title = element_blank(), legend.position = 'top')
+
+
+## for heat pain----
+path_m3_har <- "~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/Hargreave/m3_trace_har.xlsx"
+t_har_m3 <- c(1171, 2159, 3579, 4708, 5693, 6910)
+
+dat_har_m3 <-cc_miniscope_matlab(path_m3_har, t_har_m3)
+
+## for m7
+path_m7_har <- "~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/Hargreave/m7_trace_har.xlsx"
+t_har_m7 <- c(756, 1917, 2947, 3541, 4402, 5450, 6937)
+
+dat_har_m7 <-cc_miniscope_matlab(path_m7_har, t_har_m7)
+
+dat_cell_trace <- vector(mode = "list", length = length(t_har_m3))
+for (i in 1:length(t_har_m3)) {
+  dat_cell_trace[[i]] <- cbind(dat_har_m3[[i]], dat_har_m7[[i]] )
+  
+}
+
+
+dat_cell_trace_re <- vector(mode = "list", length = length(t_har_m3))
+
+# k-menas clustering
+mouse_ID_har <- c("m3", "m7")
+for (i in 1:length(dat_cell_trace)) {
+  dat_cell_trace_d <- dat_cell_trace[[i]]
+  cell_id <- sprintf("Cell%s",seq(1:ncol(dat_cell_trace_d)))
+  colnames(dat_cell_trace_d)<- cell_id
+  
+  dat_cell_trace_d_cluster <- unname(kmeans(t(dat_cell_trace_d), centers = 3, nstart = 20)[[1]])
+  stim_time<- seq(-2, 6.5, by=0.5)
+  #stim_time<- seq(-5, 8.5, by=0.5)
+  
+  dat_cell_trace_d_re<- as.data.frame(dat_cell_trace_d) %>% 
+    mutate(., Time= stim_time) %>% 
+    melt(., id.vars='Time') %>% 
+    mutate(., Group= rep(dat_cell_trace_d_cluster, each=length(stim_time)) )
+  
+  ## sort data by the value in each group
+  dat_cell_d_sort <- as.numeric(names(sort(tapply(dat_cell_trace_d_re$value, dat_cell_trace_d_re$Group, mean), decreasing = T)))
+  
+  dat_cell_trace_d_re$Group[dat_cell_trace_d_re$Group == dat_cell_d_sort[1]] ="Excited"
+  dat_cell_trace_d_re$Group[dat_cell_trace_d_re$Group == dat_cell_d_sort[2]] ="Neutral"
+  dat_cell_trace_d_re$Group[dat_cell_trace_d_re$Group == dat_cell_d_sort[3]] ="Inhibited"
+  
+  rep_time <- c(ncol(dat_har_m3[[i]]), ncol(dat_har_m7[[i]]))
+  dat_cell_trace_d_re <- mutate(dat_cell_trace_d_re, Group= factor(Group, levels = c("Excited", "Neutral", "Inhibited"))) %>% 
+    mutate(., ID = rep(mouse_ID_har, rep_time*length(stim_time)) )
+  
+  dat_cell_trace_re[[i]] <- dat_cell_trace_d_re
+}
+
+## plot trace by group
+dat_cell_har_sta <- mapply(function (x) ddply(x, .(ID,Time, Group), summarise,value=mean(value)), dat_cell_trace_re, SIMPLIFY = F) %>% 
+  do.call(rbind, .) %>% 
+  ddply(., .(ID,Time, Group), summarise,value=mean(value)) %>% 
+  mutate(Group = factor(Group, levels = c("Neutral", "Excited", "Inhibited")))
+
+
+
+
+## group by day
+p_trace <- ddply(dat_cell_har_sta, .(Time, Group), summarise,n=length(value),mean=mean(value),sd=sd(value),se=sd(value)/sqrt(length(value))) %>% 
+  ggplot(., aes(Time, mean, colour=Group))+
+  geom_line()+
+  geom_ribbon(aes(ymin=mean-se, ymax=mean+se, fill=Group), alpha=0.1, linetype=0)+
+  scale_colour_manual(values=c("#999999", "darkred", "navy"))+
+  scale_fill_manual(values=c("#999999", "darkred", "navy"))+
+  labs(x="Time relative to crossing (s)", y="Z score")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  geom_vline(xintercept = 0, col= 'red', linetype=2)+
+  theme(legend.title = element_blank(), legend.position = 'none')
+
+
+
+## calculate the sum of active and inhibited trace
+
+p_trace_sum <- filter(dat_cell_har_sta, Group!="Neutral") %>%
+  ddply(., .(ID,Time), summarise, value=sum(value)) %>%
+  ddply(., .(Time), summarise,n=length(value),mean=mean(value),sd=sd(value),se=sd(value)/sqrt(length(value))) %>% 
+  ggplot(., aes(Time, mean))+
+  geom_line()+
+  geom_ribbon(aes(ymin=mean-se, ymax=mean+se), alpha=0.1, linetype=0)+
+  labs(x="Time relative to crossing (s)", y="AUC (z score)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  geom_vline(xintercept = 0, col= 'red', linetype=2)+
+  theme(legend.title = element_blank(), legend.position = 'top')
