@@ -10,6 +10,7 @@
 ## updated: 05062020, only analyze the first across 
 ## updated:05112020, add code for ctrl experiment (mouse in homecage)
 ## updated: 05222020, calculate the spiking frequency before and after crossing
+## updated: 08032020, only compare the pre-test and test
 
 ## import needed library-----
 library("reshape2")
@@ -71,6 +72,7 @@ c_miniscope_matlab <- function(ID_trace, t_stim) {
   return(dat_cell_trace_average)
   
 }
+
 ## Extract trace from each mice------
 # for m3
 path_trace_m3 <- as.list(list.files(path ="~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m3/trace_days/", pattern = "*.xlsx", full.names = T ))
@@ -184,11 +186,12 @@ for (i in 1:length(dat_cell_trace)) {
 }
 
 
-## heat plot of d3, d6 and d7----
+## heat plot of d3 and d7----
 ## set the range of z score during all days
-score_range <- range(mapply(function(x) x$value, dat_cell_trace_re, SIMPLIFY = T))
-
-for (i in c(3, 6, 7)) {
+score_range <- rbind(dat_cell_trace_re[[3]], dat_cell_trace_re[[7]]) %>% 
+  .$value %>% 
+  range()
+for (i in c(3, 7)) {
   dat_trace <- dat_cell_trace_re[[i]]
   dat_trace_sta <- ddply(dat_trace, .(variable, Group), summarise,mean=mean(value), sum=sum(value))
   dat_trace_sta <- dat_trace_sta[order(dat_trace_sta[,'mean']),]
@@ -214,31 +217,22 @@ for (i in c(3, 6, 7)) {
 }
 
 ## combine the heat plot
-p_heat_com <- plot_grid(p_heat_d3, p_heat_d6, p_heat_d7, nrow = 1)
+p_heat_com <- plot_grid(p_heat_d3, p_heat_d7, nrow = 1)
 
 setwd("~cchen2/Documents/neuroscience/Pn\ project/Figure/PDF/")
-cairo_pdf("p_anti_heat.pdf", width = 170/25.6, height = 65/25.6, family = "Arial")
+cairo_pdf("p_anti_heat.pdf", width = 90/25.6, height = 55/25.6, family = "Arial")
 p_heat_com
 dev.off()
 
 ## plot trace by group-----
-dat_cell_trace_pre_sta <- ddply(dat_cell_trace_re[[2]], .(ID,Time, Group), summarise,value=mean(value)) %>%
-  rbind(.,ddply(dat_cell_trace_re[[3]], .(ID,Time, Group), summarise,value=mean(value)) ) %>%
-  ddply(., .(ID, Time, Group),summarise,value=mean(value) )
-
-dat_cell_trace_con_sta <- ddply(dat_cell_trace_re[[5]], .(ID,Time, Group), summarise,value=mean(value)) %>%
-  rbind(.,ddply(dat_cell_trace_re[[6]], .(ID,Time, Group), summarise,value=mean(value)) ) %>%
-  ddply(., .(ID, Time, Group),summarise,value=mean(value) )
-
+dat_cell_trace_pre_sta <-  ddply(dat_cell_trace_re[[3]], .(ID,Time, Group), summarise,value=mean(value)) 
 dat_cell_trace_test_sta <- ddply(dat_cell_trace_re[[7]], .(ID,Time, Group), summarise,value=mean(value))
 
 dat_cell_trace_sta <- ddply(dat_cell_trace_pre_sta, .(Time, Group), summarise,n=length(value),mean=mean(value),sd=sd(value),se=sd(value)/sqrt(length(value))) %>%
-  rbind(., ddply(dat_cell_trace_con_sta, .(Time, Group), summarise,n=length(value),mean=mean(value),sd=sd(value),se=sd(value)/sqrt(length(value)))) %>%
   rbind(., ddply(dat_cell_trace_test_sta, .(Time, Group), summarise,n=length(value),mean=mean(value),sd=sd(value),se=sd(value)/sqrt(length(value)))) %>%
-  mutate(., Day = rep(c("Pre", "Cond.", "Test"),each= length(stim_time)*3))
+  mutate(., Day = rep(c("Pre",  "Test"),each= length(stim_time)*3)) %>% 
+  mutate(Day = factor(Day, levels = c("Pre",  "Test")), Group = factor(Group,levels = c("Neutral", "Excited", "Inhibited") ))
 
-dat_cell_trace_sta$Day <- factor(dat_cell_trace_sta$Day, levels = c("Pre", "Cond.", "Test"))
-dat_cell_trace_sta$Group <- factor(dat_cell_trace_sta$Group, levels = c("Neutral", "Excited", "Inhibited"))
 range_trace_plot <- range(dat_cell_trace_sta$mean)
 
 ## group by day
@@ -260,7 +254,7 @@ p_trace <- ggplot(dat_cell_trace_sta, aes(Time, mean, colour=Group))+
   theme(legend.title = element_blank(), legend.position = 'none')
 
 setwd("~cchen2/Documents/neuroscience/Pn\ project/Figure/PDF/")
-cairo_pdf("p_trace.pdf", width = 165/25.6, height = 65/25.6, family = "Arial")
+cairo_pdf("p_trace.pdf", width = 90/25.6, height = 62/25.6, family = "Arial")
 p_trace
 dev.off()
 
@@ -298,10 +292,40 @@ setwd("~cchen2/Documents/neuroscience/Pn\ project/Figure/PDF/")
 cairo_pdf("p_trace_cor.pdf", width = 60/25.6, height = 65/25.6, family = "Arial")
 p_trace_cor
 dev.off()
+
 ## correlation for each mice
+dat_cell_cor <- NULL
+cell_area_day <- c("Rm","Pre", "Pre", "Rm","Cond.","Cond.", "Test")
+
+for (i in c(3,  7)) {
+  dat_trace <- subset(dat_cell_trace_re[[i]], dat_cell_trace_re[[i]]$ID=="m855") %>%
+    subset(., .$Group != "Neutral") %>%
+    ddply(., .(Time, Group), summarise, value=mean(value)) %>%
+    dcast(., Time~Group) %>%
+    mutate(., Day = cell_area_day[i])
+  dat_cell_cor <- rbind(dat_cell_cor, dat_trace)
+  
+}
+dat_cell_cor$Day <- factor(dat_cell_cor$Day, levels = c("Pre",  "Test"))
+
+p_trace_cor <- ggplot(dat_cell_cor, aes(Excited, -Inhibited, colour=Day))+
+  geom_point()+
+  geom_smooth(method = "lm", lwd=0.8)+
+  scale_colour_manual(values=c("seagreen", "indianred", "deepskyblue4"))+  
+  labs(x="Excited (z-score)", y="Inhibited (z-score)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  theme(legend.title = element_blank(), legend.position = c(0.2, 0.8))
+
+
 dat_cell_trace_cor <- NULL
 cell_area_day <- c("Rm","Pre", "Pre", "Rm","Cond.","Cond.", "Test")
-for (i in c(2,3,5,6,7)){
+for (i in c(3,7)){
   dat_trace_cor <- dat_cell_trace_re[[i]] %>%
     ddply(., .(ID, Time, Group), summarise, value=mean(value,na.rm = T)) %>%
     subset(., .$Group!="Neutral") %>%
@@ -309,11 +333,11 @@ for (i in c(2,3,5,6,7)){
     ddply(., .(ID), summarise, "corr" = cor(Excited, Inhibited, method = "spearman")) %>%
     mutate(., Day = cell_area_day[i])
   dat_cell_trace_cor <- rbind(dat_cell_trace_cor, dat_trace_cor)
-  }
+}
 
 dat_cor_value <- ddply(dat_cell_trace_cor, .(ID, Day), summarise, "corr" = mean(corr)) %>%
-  mutate(Day = factor(Day, levels = c("Pre", "Cond.", "Test")))
-  
+  mutate(Day = factor(Day, levels = c("Pre",  "Test")))
+
 p_cor <-ggplot(dat_cor_value, aes(Day, corr, fill=Day))+
   geom_boxplot(outlier.shape = NA)+
   geom_jitter(width = 0.2, shape=1)+
@@ -328,6 +352,8 @@ p_cor <-ggplot(dat_cor_value, aes(Day, corr, fill=Day))+
         axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
   theme(legend.title = element_blank(), legend.position = "none")
 
+
+
 setwd("~cchen2/Documents/neuroscience/Pn\ project/Figure/PDF/")
 cairo_pdf("p_cor.pdf", width = 40/25.6, height = 65/25.6, family = "Arial")
 p_cor
@@ -335,20 +361,20 @@ dev.off()
 
   
 ## calculate the sum of active and inhibited trace----
-dat_cell_trace_sum <- rbind(dat_cell_trace_pre_sta, dat_cell_trace_con_sta, dat_cell_trace_test_sta) %>%
+dat_cell_trace_sum <- rbind(dat_cell_trace_pre_sta, dat_cell_trace_test_sta) %>%
   as_tibble() %>% 
-  mutate(Day = rep(c("Pre", "Cond.", "Test"), c(nrow(dat_cell_trace_pre_sta),nrow(dat_cell_trace_con_sta),nrow(dat_cell_trace_test_sta)))) %>%
+  mutate(Day = rep(c("Pre",  "Test"), c(nrow(dat_cell_trace_pre_sta),nrow(dat_cell_trace_test_sta)))) %>%
   subset(., .$Group!="Neutral") %>%
   ddply(., .(ID,Time, Day), summarise, value=sum(value)) %>%
   ddply(., .(Time, Day), summarise,n=length(value),mean=mean(value),sd=sd(value),se=sd(value)/sqrt(length(value))) %>%
-  mutate(Day = factor(Day, levels = c("Pre", "Cond.", "Test")))
+  mutate(Day = factor(Day, levels = c("Pre",  "Test")))
 
 p_trace_sum <- ggplot(dat_cell_trace_sum, aes(Time, mean, colour=Day))+
   geom_line()+
-  geom_ribbon(aes(ymin=mean-se, ymax=mean+se, fill=Day), alpha=0.1, linetype=0)+
-  scale_colour_manual(values=c("seagreen", "indianred", "deepskyblue4"))+
-  scale_fill_manual(values=c("seagreen", "indianred", "deepskyblue4"))+
-  labs(x="Time relative to crossing (s)", y="AUC (z score)")+
+  geom_ribbon(aes(ymin=mean-se, ymax=mean+se, fill=Day), alpha=0.2, linetype=0)+
+  scale_colour_manual(values=c("deepskyblue4", "indianred"))+
+  scale_fill_manual(values=c("deepskyblue4", "indianred"))+
+  labs(x="Time relative to crossing (s)", y="z score")+
   theme(axis.line.x = element_line(),
         axis.line.y = element_line(),
         panel.grid.major = element_blank(),
@@ -357,7 +383,9 @@ p_trace_sum <- ggplot(dat_cell_trace_sum, aes(Time, mean, colour=Day))+
         panel.background = element_blank(),
         axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
   geom_vline(xintercept = 0, col= 'red', linetype=2)+
-  theme(legend.title = element_blank(), legend.position = 'top')
+  theme(legend.title = element_blank(), legend.position = c(0.2, 0.8))
+
+
 
 setwd("~cchen2/Documents/neuroscience/Pn\ project/Figure/PDF/")
 cairo_pdf("p_trace_sum.pdf", width = 60/25.6, height = 70/25.6, family = "Arial")
@@ -367,7 +395,7 @@ dev.off()
 ## for EI change analysis-----
 dat_cell_area <- c()
 cell_area_day <- c("Rm","Pre", "Pre", "Rm","Cond.","Cond.", "Test")
-for (i in c(2,3,5,6,7)){
+for (i in c(3,7)){
   rep_time <- c(ncol(dat_trace_m3[[i]]), ncol(dat_trace_m7[[i]]), ncol(dat_trace_m17[[i]]), ncol(dat_trace_m18[[i]]), ncol(dat_trace_m855[[i]]))
   dat_trace <- dat_cell_trace_re[[i]]
   dat_trace$ID <- rep(mouse_ID, rep_time*length(stim_time))
@@ -383,13 +411,15 @@ for (i in c(2,3,5,6,7)){
   dat_cell_area <- rbind(dat_cell_area, dat_anti_area)
 }
 
-dat_cell_area$Day <- factor(dat_cell_area$Day, levels = c("Pre", "Cond.","Test"))
-dat_cell_area_sta <-  ddply(dat_cell_area, .(ID, Day), summarise, value=mean(ratio, na.rm = T))
+dat_cell_area$Day <- factor(dat_cell_area$Day, levels = c("Pre","Test"))
 
-p_EI_ratio <- ggplot(dat_cell_area_sta, aes(Day, value, fill=Day))+
+p_EI_ratio <- dat_cell_area %>% 
+  select(ID,Day, ratio) %>% 
+  ggplot(., aes(Day, ratio, color=Day))+
   geom_boxplot(outlier.shape = NA)+
+  geom_line(aes(group = ID), color="gray90")+
   geom_jitter(width = 0.2, shape=1)+
-  scale_fill_manual(values=c("seagreen", "indianred", "deepskyblue4"))+
+  scale_colour_manual(values=c("deepskyblue4", "indianred"))+
   labs(x="", y="E/I ratio")+
   theme(axis.line.x = element_line(),
         axis.line.y = element_line(),
@@ -399,15 +429,15 @@ p_EI_ratio <- ggplot(dat_cell_area_sta, aes(Day, value, fill=Day))+
         panel.background = element_blank(),
         axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
   scale_y_continuous(limits = c(0, 4), expand = c(0,0))+
-  theme(legend.title = element_blank(), legend.position = "none")+
-  annotate(x=c(1,1,2,2), y=c(3.4,3.5,3.5,3.4),"path")+
-  annotate("text",x=1.5,y=3.5, label="***", size=5)
+  theme(legend.title = element_blank(), legend.position = "none")
+  #annotate(x=c(1,1,2,2), y=c(3.4,3.5,3.5,3.4),"path")+
+  #annotate("text",x=1.5,y=3.5, label="***", size=5)
 
 
 ## statistic test
-t_EI<-aov(value~Day, data=dat_cell_area_sta)
-summary(t_EI)
-pairwise.t.test(dat_cell_area_sta$value, dat_cell_area_sta$Day, paired = T)
+t_EI<-dat_cell_area %>% 
+  select(Day, ID, ratio) %>% 
+  t.test(ratio~Day, ., paired = TRUE)
 
 
 setwd("~cchen2/Documents/neuroscience/Pn\ project/Figure/PDF/")
@@ -415,13 +445,14 @@ cairo_pdf("p_EI_ratio.pdf", width = 40/25.6, height = 65/25.6, family = "Arial")
 p_EI_ratio
 dev.off() 
 ## plot the sum of E-I----
-dat_cell_sum_sta <-  ddply(dat_cell_area, .(ID, Day), summarise, "sum"= mean(sum, na.rm = T))
 
-
-p_EI_sum<- ggplot(dat_cell_sum_sta, aes(Day, sum, fill=Day))+
+p_EI_sum<- dat_cell_area %>% 
+  select(Day, ID, sum) %>% 
+  ggplot(., aes(Day, sum, colour=Day))+
   geom_boxplot(outlier.shape = NA)+
+  geom_line(aes(group=ID), colour="gray90")+
   geom_jitter(width = 0.2, shape=1)+
-  scale_fill_manual(values=c("seagreen", "indianred", "deepskyblue4"))+
+  scale_colour_manual(values=c("deepskyblue4", "indianred" ))+
   labs(x="", y="AUG (z-score)")+
   theme(axis.line.x = element_line(),
         axis.line.y = element_line(),
@@ -430,26 +461,35 @@ p_EI_sum<- ggplot(dat_cell_sum_sta, aes(Day, sum, fill=Day))+
         panel.border = element_blank(),
         panel.background = element_blank(),
         axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
-  #scale_y_continuous(limits = c(0, 10), expand = c(0,0))+
-  theme(legend.title = element_blank(), legend.position = "none")+
-  annotate(x=c(1,1,2,2), y=c(9,9.1,9.1,9),"path")+
-  annotate("text",x=1.5,y=9.1, label="*", size=5)
+  scale_y_continuous(limits = c(-2, 12), expand = c(0,0))+
+  theme(legend.title = element_blank(), legend.position = "none")
+  #annotate(x=c(1,1,2,2), y=c(9,9.1,9.1,9),"path")+
+  #annotate("text",x=1.5,y=9.1, label="*", size=5)
   
 
 ## statistic test
-t_sum_EI<-aov(sum~Day, data=dat_cell_sum_sta)
-summary(t_EI)
-pairwise.t.test(dat_cell_sum_sta$sum, dat_cell_sum_sta$Day, paired = T)
+t_sum_EI<-dat_cell_area %>% 
+  select(Day, ID, sum) %>% 
+  t.test(sum~Day, ., paired=T)
+
+p_trace_sum_com <- plot_grid(p_EI_ratio, p_EI_sum, nrow = 1) %>% 
+  plot_grid(p_trace_sum, ., nrow = 2)
+
+setwd("~cchen2/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_trace_sum_com.pdf", width = 75/25.6, height = 110/25.6, family = "Arial")
+p_trace_sum_com
+dev.off()
 
 ## show the change of E, I and sum
 p_EIS_change <- dat_cell_area %>%
   select("Excited", "Inhibited","ID","Day", "sum") %>%
   melt(., id.vars= c('Day', "ID")) %>%
   ddply(., .(ID, Day, variable), summarise, value=mean(value, na.rm = T)) %>%
-  ggplot(., aes(variable, value, fill=Day))+
+  ggplot(., aes(interaction(Day, variable), value, colour=Day))+
   geom_boxplot(outlier.shape = NA)+
-  geom_jitter(position=position_jitterdodge(), shape=1, size=1)+
-  scale_fill_manual(values=c("seagreen", "indianred", "deepskyblue4"))+
+  geom_line(aes(group=interaction(ID, variable)), colour="gray90") +
+  geom_jitter(width = 0.2, shape=1, size=1)+
+  scale_colour_manual(values=c("deepskyblue4", "indianred" ))+
   labs(x="", y="AUC (z-score)")+
   theme(axis.line.x = element_line(),
         axis.line.y = element_line(),
@@ -458,31 +498,32 @@ p_EIS_change <- dat_cell_area %>%
         panel.border = element_blank(),
         panel.background = element_blank(),
         axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
-  theme(legend.title = element_blank(), legend.position = "top")
+  theme(legend.title = element_blank(), legend.position = "none")
+
 
 setwd("~cchen2/Documents/neuroscience/Pn\ project/Figure/PDF/")
-cairo_pdf("p_EIS_change.pdf", width = 70/25.6, height = 72/25.6, family = "Arial")
+cairo_pdf("p_EIS_change.pdf", width = 95/25.6, height = 60/25.6, family = "Arial")
 p_EIS_change
 dev.off()
   
 ## portion of cell catlog------
 
-dat_cell_cat <- mapply(function (x) subset(x, x$Time==0), dat_cell_trace_re, SIMPLIFY = F ) 
+dat_cell_cat <- mapply(function (x) subset(x, x$Time==0), dat_cell_trace_re[c(3,7)], SIMPLIFY = F ) 
 
 dat_cell_cat1 <- mapply(function(x) prop.table(table(x$ID, x$Group), 1), dat_cell_cat, SIMPLIFY = F) %>%
   do.call(rbind, .) %>%
   as.data.frame() %>%
-  mutate(ID = rep(rownames(.)[1:4], 7), Day=rep(c("Rm", "Pre", "Pre", "Rm", "Cond.", "Cond.", "Test"), each=4)) %>%
-  subset(., .$Day!="Rm") %>%
+  mutate(ID = rep(rownames(.)[1:length(mouse_ID)], 2), Day=rep(c("Pre", "Test"), each=length(mouse_ID))) %>%
   melt(., id.vars = c("ID", "Day")) %>%
   ddply(., .(ID, Day, variable), summarise, "Prop"=mean(value)) %>%
-  mutate(Day = factor(Day, levels = c("Pre", "Cond.", "Test"))) %>%
+  mutate(Day = factor(Day, levels = c("Pre", "Test"))) %>%
   mutate(variable=factor(variable, levels = c("Excited", "Neutral", "Inhibited")))
 
-p_cat<- ggplot(dat_cell_cat1, aes(variable, Prop, fill=Day))+
+p_cat<- ggplot(dat_cell_cat1, aes(interaction(Day,variable), Prop, colour=Day))+
   geom_boxplot(outlier.shape = NA)+
+  geom_line(aes(group=interaction(ID, variable)), colour="gray90")+
   geom_jitter(position=position_jitterdodge(), shape=1, size=1)+
-  scale_fill_manual(values=c("seagreen", "indianred", "deepskyblue4"))+
+  scale_colour_manual(values=c( "deepskyblue4", "indianred"))+
   labs(x="", y="% of all neurons")+
   theme(axis.line.x = element_line(),
         axis.line.y = element_line(),
@@ -492,10 +533,10 @@ p_cat<- ggplot(dat_cell_cat1, aes(variable, Prop, fill=Day))+
         panel.background = element_blank(),
         axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
   scale_y_continuous(limits = c(0,1),expand = c(0,0))+
-  theme(legend.title = element_blank(), legend.position = "top")
+  theme(legend.title = element_blank(), legend.position = "none")
 
 setwd("~cchen2/Documents/neuroscience/Pn\ project/Figure/PDF/")
-cairo_pdf("p_cat.pdf", width = 70/25.6, height = 72/25.6, family = "Arial")
+cairo_pdf("p_cat.pdf", width = 90/25.6, height = 60/25.6, family = "Arial")
 p_cat
 dev.off()
 
@@ -509,52 +550,54 @@ cc_firing_fun <- function(path_trace, path_peak, t_stim) {
     unlist() %>% 
     na.omit()
   
-  ctrl_rang <- range(t_stim-40, t_stim)
-  test_rang <- range(t_stim, t_stim +80)
+  ctrl_rang <- range(t_stim-22, t_stim-2)
+  test_rang <- range(t_stim, t_stim +40)
   
-  ctrl_freq <- length(dat_peak[dat_peak>= ctrl_rang[1] & dat_peak < ctrl_rang[2]])/2 # 2s before crossing
-  test_freq <- length(dat_peak[dat_peak>= test_rang[1] & dat_peak < test_rang[2]])/4 # 4s after crossing
-  return(c(ctrl_freq, test_freq))
+  ctrl_freq <- length(dat_peak[dat_peak>= ctrl_rang[1] & dat_peak < ctrl_rang[2]])/1 # 2s before crossing
+  test_freq <- length(dat_peak[dat_peak>= test_rang[1] & dat_peak < test_rang[2]])/2 # 4s after crossing
+  diff_freq <- test_freq - ctrl_freq
+  
+  return(c(ctrl_freq, test_freq, diff_freq))
 }
 
 ## for m3
-
-path_peak_m3 <- as.list(list.files(path ="~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m3/peaks_days/", pattern = "*.csv", full.names = T ))
-
+path_peak_m3 <- as.list(list.files(path ="~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m3/peaks_days", pattern = "*.csv", full.names = T ))[c(3, 7)]
 dat_rate_m3 <- t(mapply(cc_firing_fun, path_trace_m3, path_peak_m3, t_stim_m3))
 
 ## for m7
-path_peak_m7 <- as.list(list.files(path ="~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m7/peaks_days/", pattern = "*.csv", full.names = T ))
-
+path_peak_m7 <- as.list(list.files(path ="~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m7/peaks_days/", pattern = "*.csv", full.names = T ))[c(3, 7)]
 dat_rate_m7 <- t(mapply(cc_firing_fun, path_trace_m7, path_peak_m7, t_stim_m7))
 
 ## for m17
-path_peak_m17 <- as.list(list.files(path ="~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m17/peaks_days/", pattern = "*.csv", full.names = T ))
+path_peak_m17 <- as.list(list.files(path ="~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m17/peaks_days/", pattern = "*.csv", full.names = T ))[c(3, 7)]
 dat_rate_m17 <- t(mapply(cc_firing_fun, path_trace_m17, path_peak_m17, t_stim_m17))
 
 ## for m18
-path_peak_m18 <- as.list(list.files(path ="~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m18/peaks_days/", pattern = "*.csv", full.names = T ))
-
+path_peak_m18 <- as.list(list.files(path ="~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m18/peaks_days/", pattern = "*.csv", full.names = T ))[c(3, 7)]
 dat_rate_m18 <- t(mapply(cc_firing_fun, path_trace_m18, path_peak_m18, t_stim_m18))
 
-## combine data and plot
-dat_firing <- rbind(dat_rate_m3, dat_rate_m7, dat_rate_m17, dat_rate_m18) %>% 
-  as_tibble() %>% 
-  rename(Freq_before = V1, Freq_after = V2) %>% 
-  mutate(Day = rep(str_c("D", 1:7), 4)) %>% 
-  mutate(ID = rep(mouse_ID, each=7)) %>% 
-  mutate(Group = rep(cell_area_day, 4)) %>% 
-  filter(Group != "Rm") %>% 
-  gather(variable, value, -ID, -Day, -Group) %>% 
-  ddply(., .(ID, Group, variable, Day), summarise, value=mean(value)) %>% 
-  ddply(., .(ID, Group, variable), summarise, value=mean(value)) %>% 
-  mutate(Group= factor(Group, levels = c("Pre", "Cond.", "Test")), 
-         variable=factor(variable, levels = c("Freq_before", "Freq_after")))
+## for m855
+path_peak_m855 <- as.list(list.files(path ="~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m855/peaks_days/", pattern = "*.csv", full.names = T ))[c(3, 7)]
+dat_rate_m855 <- t(mapply(cc_firing_fun, path_trace_m855, path_peak_m855, t_stim_m855))
 
-p_firing <- ggplot(dat_firing, aes(Group, value, fill=variable))+
+
+## combine data and plot
+dat_firing <- rbind(dat_rate_m3, dat_rate_m7, dat_rate_m17, dat_rate_m18, dat_rate_m855) %>% 
+  as_tibble() %>% 
+  rename(Freq_before = V1, Freq_after = V2, diff = V3) %>% 
+  mutate(ID = rep(mouse_ID, each=2)) %>% 
+  mutate(Group = rep(group_day, length(mouse_ID))) %>% 
+  gather(variable, value, -ID, -Day, -Group) %>% 
+  ddply(., .(ID, Group, variable), summarise, value=mean(value)) %>% 
+  mutate(Group= factor(Group, levels = c("Pre",  "Test")))
+
+p_firing <- dat_firing %>% 
+  filter(variable=="diff") %>% 
+  ggplot(., aes(Group, value, colour=Group))+
   geom_boxplot(outlier.shape = NA)+
-  geom_jitter(position=position_jitterdodge(), shape=1, size=1)+
-  scale_fill_manual(values=c("seagreen", "indianred"))+
+  geom_line(aes(group=ID), colour="gray90")+
+  geom_jitter(width = 0.2, shape=1, size=1)+
+  scale_colour_manual(values=c("seagreen", "indianred"))+
   labs(x="", y="Firing rate (Hz)")+
   theme(axis.line.x = element_line(),
         axis.line.y = element_line(),
@@ -563,8 +606,8 @@ p_firing <- ggplot(dat_firing, aes(Group, value, fill=variable))+
         panel.border = element_blank(),
         panel.background = element_blank(),
         axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
-  # scale_y_continuous(limits = c(0,3),expand = c(0,0))+
-  theme(legend.title = element_blank(), legend.position = "top")
+  scale_y_continuous(limits = c(-4,4))+
+  theme(legend.title = element_blank())
 
 ## within and cross cells distance-----
 ## function to trim cell position file with the manually confirmed cells
@@ -704,20 +747,18 @@ dat_cell_cov_list <- mapply(cc_cov_fun, dat_cell_trace_re, SIMPLIFY = F)
 
 
 ## cov matrix heatmap for m3
-cov_range <- range(c(dat_cell_cov_list[[3]][[1]], dat_cell_cov_list[[6]][[1]], dat_cell_cov_list[[7]][[1]]))
+cov_range <- range(c(dat_cell_cov_list[[3]][[1]], dat_cell_cov_list[[7]][[1]]))
 
-p_cov_d3<- ggcorrplot(dat_cell_cov_list[[3]][[1]],hc.order = TRUE, outline.col = "white", ggtheme = ggplot2::theme_void, 
-                      show.legend = F)+
-  scale_fill_gradient2(limit = c(cov_range[1], cov_range[2]), low = "navy", high =  "red4", mid = "white")
+p_cov_d3<- ggcorrplot(dat_cell_cov_list[[3]][[1]], hc.order = TRUE, outline.col = "white")+
+  scale_fill_gradient2(limit = c(cov_range[1], cov_range[2]), low = "navy", high =  "red4", mid = "white")+
+  theme_void()+
+  theme(legend.position = "none")
 
-p_cov_d6<- ggcorrplot(dat_cell_cov_list[[6]][[1]],hc.order = TRUE, outline.col = "white", ggtheme = ggplot2::theme_void, 
-                      show.legend = F)+
-  scale_fill_gradient2(limit = c(cov_range[1], cov_range[2]), low = "navy", high =  "red4", mid = "white")
-
-p_cov_d7<- ggcorrplot(dat_cell_cov_list[[7]][[1]],hc.order = TRUE, outline.col = "white", ggtheme = ggplot2::theme_void)+
-  scale_fill_gradient2(limit = c(cov_range[1], cov_range[2]), low = "navy", high =  "red4", mid = "white")
-
-p_cov_com <- plot_grid(p_cov_d3, p_cov_d6, p_cov_d7, nrow = 1)
+p_cov_d7<- ggcorrplot(dat_cell_cov_list[[7]][[1]], hc.order = TRUE, outline.col = "white")+
+  scale_fill_gradient2(limit = c(cov_range[1], cov_range[2]), low = "navy", high =  "red4", mid = "white")+
+  theme_void()+
+  theme(legend.position = "none")
+p_cov_com <- plot_grid(p_cov_d3, p_cov_d7, nrow = 1)
 
 setwd("~cchen2/Documents/neuroscience/Pn\ project/Figure/PDF/")
 cairo_pdf("p_cov_com.pdf", width = 170/25.6, height = 60/25.6, family = "Arial")
@@ -728,7 +769,7 @@ dev.off()
 ## compare the covrelation between cells
 dat_cell_cov <- c()
 dat_cell_cov_sta <- c()
-for (i in c(2,3,5,6,7)){
+for (i in c(3,7)){
   c_trim <- function(x){
     x[upper.tri(x)]<- NA
     c(x[!is.na(x)])
@@ -751,11 +792,11 @@ for (i in c(2,3,5,6,7)){
 
 
 ## cummulative plot of matrix
-dat_cell_cov$Day <- factor(dat_cell_cov$Day, levels = c("Pre", "Cond.", "Test"))
+dat_cell_cov$Day <- factor(dat_cell_cov$Day, levels = c("Pre",  "Test"))
 p_cov_cum<- ggplot(dat_cell_cov, aes(value, group=Day, colour=Day))+
   stat_ecdf(geom = "step")+
-  scale_color_manual(values=c( "mediumseagreen","indianred4", "dodgerblue4"))+
-  labs(x="", y="Cummulative fraction of neurons")+
+  scale_color_manual(values=c( "deepskyblue4", "indianred"))+
+  labs(x="", y="Cummulative probability")+
   theme(axis.line.x = element_line(),
         axis.line.y = element_line(),
         panel.grid.major = element_blank(),
@@ -776,14 +817,15 @@ dev.off()
 
 dat_cell_cov_sta1 <- melt(dat_cell_cov_sta, id.vars = c("ID", "Day")) %>%
   ddply(., .(ID, Day, variable), summarise, value=mean(value, na.rm = T)) %>%
-  mutate(Day = factor(Day, levels = c("Pre", "Cond.", "Test")))
+  mutate(Day = factor(Day, levels = c("Pre",  "Test")))
   
 
 p_cov_mean<- subset(dat_cell_cov_sta1, dat_cell_cov_sta1$variable=="value") %>%
-  ggplot(., aes(Day, value, fill=Day))+
+  ggplot(., aes(Day, value, colour=Day))+
   geom_boxplot(outlier.shape = NA)+
-  geom_jitter(position=position_jitterdodge(), shape=1, size=1)+
-  scale_fill_manual(values=c("seagreen", "indianred", "deepskyblue4"))+
+  geom_line(aes(group=ID), colour="gray90")+
+  geom_jitter(width = 0.2, shape=1)+
+  scale_colour_manual(values=c("deepskyblue4", "indianred"))+
   labs(x="", y="Mean covariance (z-score)")+
   theme(axis.line.x = element_line(),
         axis.line.y = element_line(),
@@ -795,10 +837,11 @@ p_cov_mean<- subset(dat_cell_cov_sta1, dat_cell_cov_sta1$variable=="value") %>%
   theme(legend.title = element_blank(), legend.position = "none")
 
 p_cov_best <- subset(dat_cell_cov_sta1, dat_cell_cov_sta1$variable=="value_max") %>%
-  ggplot(., aes(Day, value, fill=Day))+
+  ggplot(., aes(Day, value, colour=Day))+
   geom_boxplot(outlier.shape = NA)+
+  geom_line(aes(group=ID), colour="gray90")+
   geom_jitter(position=position_jitterdodge(), shape=1, size=1)+
-  scale_fill_manual(values=c("seagreen", "indianred", "deepskyblue4"))+
+  scale_colour_manual(values=c("deepskyblue4", "indianred"))+
   labs(x="", y="Max covariance (z-score)")+
   theme(axis.line.x = element_line(),
         axis.line.y = element_line(),
@@ -1042,7 +1085,7 @@ for (i in 1:n_trial) {
   
 }
 
-mouse_ID <- c("m3", "m7", "m17", "m18")
+mouse_ID <- c("m3", "m7", "m17", "m18", "m855")
 dat_cell_trace_re <- vector(mode = "list", n_trial)
 for (i in 1:length(dat_cell_trace)) {
   dat_cell_trace_d <- dat_cell_trace[[i]]
@@ -1382,3 +1425,221 @@ p_trace_sum <- filter(dat_cell_har_sta, Group!="Neutral") %>%
         axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
   geom_vline(xintercept = 0, col= 'red', linetype=2)+
   theme(legend.title = element_blank(), legend.position = 'top')
+
+
+## Global ID only plot day3 and day7 (08092020)-----
+
+cc_globalID_fun <- function(path_ID, path_trace, t_stim){
+  Global_ID <- read.csv(path_ID, header = F) %>% 
+    na_if(., 0) %>% 
+    drop_na()
+  
+  
+  ## read.xlsx with no header and remove the first col
+  cc_read.xlsx<- function(x){
+    dat <- read.xlsx(x, colNames = F) %>% 
+      select(., -1)
+    dat
+  }
+  
+  ## do z score of the whole trace
+  dat_trace <- mapply(cc_read.xlsx, path_trace,SIMPLIFY = F) %>% 
+    mapply(function(x) apply(x, 2, scale), ., SIMPLIFY = F)
+  
+  stim_time<- seq(-2, 6.5, by=0.5)
+  ## number of rows to be binned
+  n <- 10 # 0.05*10=0.5
+  
+  ## create a 2 days list and put the activation of each cell in it
+  cc_trace_pick <- function(dat_trace, cell_pick){
+    dat_trace_pick <- t(dat_trace[cell_pick,])
+    dat_trace_pick
+  }
+  
+  dat_cell_trace_day <- mapply(cc_trace_pick, dat_trace, as.list(Global_ID))
+  
+  cc_trace_extract <- function(dat_cell_trace, t_stim_day){
+    dat_stim <- vector(mode = "list", length = length(t_stim_day))
+    for (i in seq_along(t_stim_day)){
+      t1_p <- t_stim_day[i]
+      dat_stim1 <- dat_cell_trace[(t1_p-40):(t1_p+140-1),]
+      dat_stim1 <- aggregate(dat_stim1,list(rep(1:(nrow(dat_stim1)%/%n+1),each=n,len=nrow(dat_stim1))),mean)[-1]
+      dat_stim[[i]] <- dat_stim1[1:5,] %>%  ## baseline as -2 to 0
+        colMeans(., na.rm = T) %>% 
+        sweep(dat_stim1, 2, ., FUN = "-")
+    }
+    ## average the trace by cell number
+    if (length(t_stim_day)>1){
+      dat_cell_trace_average <- aaply(laply(dat_stim, as.matrix), c(2, 3), function(x) mean(x, na.rm=T))
+      
+    } else {
+      dat_cell_trace_average <- data.matrix(dat_stim[[1]])
+      
+    }
+    return(dat_cell_trace_average)
+  }
+  dat_cell_trace_day_extract <- mapply(cc_trace_extract, dat_cell_trace_day, t_stim, SIMPLIFY = F)
+  
+  return(dat_cell_trace_day_extract)
+}
+
+## for m3
+global_ID_m3 <- "~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m3/Global_id/m3_anti_pin_global_ID_37.csv"
+dat_global_trace_m3 <- cc_globalID_fun(global_ID_m3, path_trace_m3[c(3, 7)], t_stim_m3[c(3,7)])
+
+## for m7
+global_ID_m7 <- "~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m7/Global_id/m7_anti_pin_global_ID_37.csv"
+dat_global_trace_m7 <- cc_globalID_fun(global_ID_m7, path_trace_m7[c(3, 7)], t_stim_m7[c(3,7)])
+
+## for m17
+global_ID_m17 <- "~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m17/Global_ID/m17_global_ID_37.csv"
+dat_global_trace_m17 <- cc_globalID_fun(global_ID_m17, path_trace_m17[c(3, 7)], t_stim_m17[c(3,7)])
+
+## for m18
+global_ID_m18 <- "~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m18/Global_ID/m18_global_ID_37.csv"
+dat_global_trace_m18 <- cc_globalID_fun(global_ID_m18, path_trace_m18[c(3, 7)], t_stim_m18[c(3,7)])
+
+## for m855
+global_ID_m855 <- "~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m855/Global_ID/m855_global_ID_37.csv"
+dat_global_trace_m855 <- cc_globalID_fun(global_ID_m855, path_trace_m855[c(3, 7)], t_stim_m855[c(3,7)])
+
+## combin data
+dat_global_trace_d3 <- cbind(dat_global_trace_m3[[1]], dat_global_trace_m7[[1]], dat_global_trace_m17[[1]], dat_global_trace_m18[[1]], dat_global_trace_m855[[1]])
+colnames(dat_global_trace_d3) <- str_c("Cell", 1:ncol(dat_global_trace_d3))
+
+dat_global_trace_d7 <- cbind(dat_global_trace_m3[[2]], dat_global_trace_m7[[2]], dat_global_trace_m17[[2]], dat_global_trace_m18[[2]], dat_global_trace_m855[[2]])
+colnames(dat_global_trace_d7) <- str_c("Cell", 1:ncol(dat_global_trace_d7))
+
+dat_cell_trace_global <- vector(mode = "list", 2)
+dat_cell_trace_global[[1]] <- dat_global_trace_d3
+dat_cell_trace_global[[2]] <- dat_global_trace_d7
+
+
+dat_cell_trace_global_re <- vector(mode = "list", 2)
+
+# k-menas clustering
+for (i in 1:length(dat_cell_trace_global)) {
+  dat_cell_trace_d <- dat_cell_trace_global[[i]]
+  
+  
+  dat_cell_trace_d_cluster <- unname(kmeans(t(dat_cell_trace_d), centers = 3, nstart = 20)[[1]])
+  stim_time<- seq(-2, 6.5, by=0.5)
+  #stim_time<- seq(-5, 8.5, by=0.5)
+  
+  dat_cell_trace_d_re<- as.data.frame(dat_cell_trace_d) %>% 
+    mutate(., Time= stim_time) %>% 
+    melt(., id.vars='Time') %>% 
+    mutate(., Group= rep(dat_cell_trace_d_cluster, each=length(stim_time)) )
+  
+  ## sort data by the value in each group
+  dat_cell_d_sort <- as.numeric(names(sort(tapply(dat_cell_trace_d_re$value, dat_cell_trace_d_re$Group, mean), decreasing = T)))
+  
+  dat_cell_trace_d_re$Group[dat_cell_trace_d_re$Group == dat_cell_d_sort[1]] ="Excited"
+  dat_cell_trace_d_re$Group[dat_cell_trace_d_re$Group == dat_cell_d_sort[2]] ="Neutral"
+  dat_cell_trace_d_re$Group[dat_cell_trace_d_re$Group == dat_cell_d_sort[3]] ="Inhibited"
+  
+  dat_cell_trace_d_re <- mutate(dat_cell_trace_d_re, Group= factor(Group, levels = c("Excited", "Neutral", "Inhibited")))
+  dat_cell_trace_global_re[[i]] <- dat_cell_trace_d_re
+}
+
+score_range <- do.call(rbind, dat_cell_trace_global_re) %>% 
+  .$value %>% 
+  range()
+
+## align by cells
+dat_trace_sta <- dat_cell_trace_global_re[[1]] %>% 
+  ddply(., .(variable, Group), summarise,mean=mean(value), sum=sum(value)) %>% 
+  arrange(., mean)
+
+for (i in c(1, 2)) {
+  dat_trace <- dat_cell_trace_global_re[[i]]
+  dat_trace$variable <- factor(dat_trace$variable, levels = dat_trace_sta$variable)
+  p_heat <- ggplot(dat_trace, aes(Time, variable,fill= value))+ 
+    geom_tile(height=2)+
+    #facet_grid(rows = vars(Group), scales = "free_y")+
+    #scale_fill_gradient2(limits= score_range,low = "navy", high = "red4", mid = "white")+
+    scale_fill_gradientn(limits= score_range, colours = c("navy", "white", "red4"), values = rescale(c(score_range[1], 0, score_range[2])))+
+    labs(x="Time relative to crossing (s)", y="Number of cells")+
+    geom_vline(xintercept = 0, col= 'red', linetype=2)+
+    theme(axis.line.x = element_line(),
+          axis.line.y = element_line(),
+          axis.text.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.border = element_blank(),
+          panel.background = element_blank(),
+          axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+    theme(legend.position = "none")
+  assign(paste0("p_heat_d", i), p_heat)
+}
+
+## combine the heat plot
+p_heat_com_global <- plot_grid(p_heat_d1, p_heat_d2, nrow = 1)
+
+setwd("~cchen2/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_anti_heat_global.pdf", width = 90/25.6, height = 55/25.6, family = "Arial")
+p_heat_com_global
+dev.off()
+
+
+dat_cell_trace_global_sta <- ddply(dat_cell_trace_global_re[[1]], .(Time, Group), summarise,n=length(value),mean=mean(value),sd=sd(value),se=sd(value)/sqrt(length(value))) %>%
+  rbind(., ddply(dat_cell_trace_global_re[[2]], .(Time, Group), summarise,n=length(value),mean=mean(value),sd=sd(value),se=sd(value)/sqrt(length(value)))) %>%
+  mutate(., Day = rep(c("Pre",  "Test"),each= length(stim_time)*3)) %>% 
+  mutate(Day = factor(Day, levels = c("Pre",  "Test")), Group = factor(Group,levels = c("Neutral", "Excited", "Inhibited") ))
+
+range_trace_plot <- range(dat_cell_trace_global_sta$mean)
+
+## group by day
+p_trace_global <- ggplot(dat_cell_trace_global_sta, aes(Time, mean, colour=Group))+
+  geom_line()+
+  geom_ribbon(aes(ymin=mean-se, ymax=mean+se, fill=Group), alpha=0.1, linetype=0)+
+  facet_grid(cols = vars(Day))+
+  scale_colour_manual(values=c("#999999", "darkred", "navy"))+
+  scale_fill_manual(values=c("#999999", "darkred", "navy"))+
+  labs(x="Time relative to crossing (s)", y="Z score")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  geom_vline(xintercept = 0, col= 'red', linetype=2)+
+  theme(legend.title = element_blank(), legend.position = 'none')
+
+setwd("~cchen2/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_trace_global.pdf", width = 90/25.6, height = 62/25.6, family = "Arial")
+p_trace_global
+dev.off()
+
+
+## plot the overlap of retro-tracing image-----
+p_retro_overlay <- read.xlsx("~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/Pn_anti_10072020.xlsx", sheet = "PN_retro_td_EGFP") %>% 
+  ggplot(., aes(Group, Percent, colour = Group))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_jitter(width = 0.25, shape=1)+
+  scale_color_manual(values=c("olivedrab", "mediumvioletred"))+
+  labs(x="", y="Overlay (%)")+
+  theme(axis.line = element_line(colour = "black"),
+        axis.text.x = element_text(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  theme(legend.position = 'none')
+
+setwd("~cchen2/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_retro_overlay.pdf", width = 50/25.6, height = 70/25.6, family = "Arial")
+p_retro_overlay
+dev.off()
+  
+  
+  
+  
+  
+  
+  
+  
+  

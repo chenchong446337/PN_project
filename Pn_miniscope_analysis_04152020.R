@@ -28,7 +28,7 @@ c_miniscope_matlab <- function(ID_trace, t_stim) {
   dat_trace <- read.xlsx(ID_trace, colNames = F, rowNames = F)
   ## analyze the trace
   dat_trace<- dat_trace[dat_trace[,1]==1, ]
-  dat_trace<- as.data.frame(t(dat_trace[,-1]))
+  dat_trace<- as.data.frame(t(dat_trace[,-c(1, 2)]))
   rownames(dat_trace) <- NULL
   colnames(dat_trace)<- NULL
   ## do z score of the whole trace
@@ -44,6 +44,7 @@ c_miniscope_matlab <- function(ID_trace, t_stim) {
   for (i in seq_along(t_stim)){
     t1_p <- t_stim[i]
     dat_stim1 <- dat_trace[(t1_p-100):(t1_p+180-1),]
+    #dat_stim1 <- apply(dat_stim1, 2, scale)
     dat_stim1 <- aggregate(dat_stim1,list(rep(1:(nrow(dat_stim1)%/%n+1),each=n,len=nrow(dat_stim1))),mean)[-1]
     dat_stim1_base <- dat_stim1[1:5,] ## baseline as -5 to -3
     dat_stim1_base_mean <- colMeans(dat_stim1_base, na.rm = T)
@@ -126,9 +127,10 @@ dat_trace_m18 <- mapply(c_miniscope_matlab, path_trace_m18, t_stim_m18, SIMPLIFY
 ## combine data and do k-means analysis-----
 dat_cell_trace <- vector(mode = "list", 7)
 for (i in 1:7) {
-  dat_cell_trace[[i]]<- cbind(dat_trace_m3[[i]], dat_trace_m7[[i]], dat_trace_m17[[i]], dat_trace_m18[[i]] )
-  
+  cell_trace<- cbind(dat_trace_m3[[i]], dat_trace_m7[[i]], dat_trace_m17[[i]], dat_trace_m18[[i]] )
+  dat_cell_trace[[i]] <- cell_trace
 }
+
 
 dat_cell_trace_re <- vector(mode = "list", 7)
 for (i in 1:length(dat_cell_trace)) {
@@ -138,7 +140,9 @@ for (i in 1:length(dat_cell_trace)) {
   
   dat_cell_trace_d_cluster <- unname(kmeans(t(dat_cell_trace_d), centers = 3)[[1]])
   dat_cell_trace_d<- as.data.frame(dat_cell_trace_d)
-  stim_time <- seq(-5, 8.5, by=0.5)
+  #stim_time<- seq(-2, 5.5, by=0.5)
+  stim_time<- seq(-5, 8.5, by=0.5)
+  
   dat_cell_trace_d$Time <- stim_time
   dat_cell_trace_d_re <- melt(dat_cell_trace_d, id.vars ='Time')
   dat_cell_trace_d_re$Group <- rep(dat_cell_trace_d_cluster, each=length(stim_time))
@@ -223,6 +227,47 @@ p_trace <- ggplot(dat_cell_trace_sta, aes(Time, mean, colour=Group))+
   scale_y_continuous(limits = c(range_trace_plot[1]- 0.2, range_trace_plot[2]+0.2))+
   theme(legend.title = element_blank())
 
+## calculate the sum of active and inhibited trace----
+dat_cell_trace_sum <- subset(dat_cell_trace_sta, dat_cell_trace_sta$Group!="Neutral") %>%
+  ddply(., .(Time, Day), summarise, sum = sum(mean))
+
+ggplot(dat_cell_trace_sum, aes(Time, sum, colour=Day))+
+  geom_line()
+
+dat_cell_trace_pre_sta_sum <- rbind(dat_cell_trace_re[[2]],dat_cell_trace_re[[3]])%>%
+  subset(., .$Group!="Neutral") %>%
+  ddply(., .(Time, ID), summarise,value1=sum(value)) %>%
+  ddply(., .(Time),summarise,n=length(value1),mean=mean(value1),sd=sd(value1),se=sd(value1)/sqrt(length(value1)))
+
+dat_cell_trace_con_sta_sum <- rbind(dat_cell_trace_re[[5]],dat_cell_trace_re[[6]])%>%
+  subset(., .$Group!="Neutral") %>%
+  ddply(., .(Time, ID), summarise,value1=sum(value)) %>%
+  ddply(., .(Time),summarise,n=length(value1),mean=mean(value1),sd=sd(value1),se=sd(value1)/sqrt(length(value1)))
+
+dat_cell_trace_test_sta_sum <- dat_cell_trace_re[[7]] %>%
+  subset(., .$Group!="Neutral") %>%
+  ddply(., .(Time, ID), summarise,value1=sum(value)) %>%
+  ddply(., .(Time),summarise,n=length(value1),mean=mean(value1),sd=sd(value1),se=sd(value1)/sqrt(length(value1)))
+
+dat_cell_trace_sum <- rbind(dat_cell_trace_pre_sta_sum, dat_cell_trace_con_sta_sum, dat_cell_trace_test_sta_sum)
+dat_cell_trace_sum$Day <- rep(c("Pre", "Cond.", "Test"),each= length(stim_time))
+dat_cell_trace_sum$Day <- factor(dat_cell_trace_sum$Day, levels = c("Pre", "Cond.", "Test"))
+
+p_trace_sum <- ggplot(dat_cell_trace_sum, aes(Time, mean, colour=Day))+
+  geom_line()+
+  geom_ribbon(aes(ymin=mean-se, ymax=mean+se, fill=Day), alpha=0.1, linetype=0)+
+  # scale_colour_manual(values=c("#999999", "darkred", "navy"))+
+  labs(x="Time relative to crossing (s)", y="Z score")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  geom_vline(xintercept = 0, col= 'red', linetype=2)+
+  theme(legend.title = element_blank())
+
 ## for EI ratio analysis-----
 dat_cell_area <- c()
 cell_area_day <- c("Rm","Pre", "Pre", "Rm","Cond.","Cond.", "Test")
@@ -243,7 +288,7 @@ for (i in c(2,3,5,6,7)){
 
 dat_cell_area$Day <- factor(dat_cell_area$Day, levels = c("Pre", "Cond.","Test"))
 dat_cell_area_com <- ddply(dat_cell_area, .(ID, Day), summarise, value=mean(ratio, na.rm = T))
-dat_cell_area_sta <- ddply(dat_cell_area_com,.(Day), summarise,n=length(value),mean=mean(value),sd=sd(value),se=sd(value)/sqrt(length(value)))
+dat_cell_area_sta <- ddply(dat_cell_area_com,.(Day), summarise,n=length(value),mean=mean(value, na.rm = T),sd=sd(value),se=sd(value)/sqrt(length(value)))
 
 
 p_EI_ratio <- ggplot(dat_cell_area_sta, aes(Day, mean, colour=Day, fill=Day))+
