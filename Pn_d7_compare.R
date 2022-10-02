@@ -1091,39 +1091,39 @@ c_miniscope_matlab_d7 <- function(ID_trace, t_stim) {
   
 }
 ## for m3
-path_trace_m3 <- "~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m3/trace_days/m3_trace_d7.xlsx"
+path_trace_m3 <- "~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m3/trace_days/m3_trace_d7.xlsx"
 t_stim_m3_d7 <- c(346, 1756)
 
 dat_stim_m3_d7 <- c_miniscope_matlab_d7(path_trace_m3, t_stim_m3_d7)
 
 
 ## for m7
-path_trace_m7 <- "~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m7/trace_days/m7_trace_d7.xlsx"
+path_trace_m7 <- "~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m7/trace_days/m7_trace_d7.xlsx"
 t_stim_m7_d7 <- c(236, 2777)
 
 dat_stim_m7_d7 <- c_miniscope_matlab_d7(path_trace_m7, t_stim_m7_d7)
 
 
 ## for m17
-path_trace_m17 <- "~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m17/trace_days/m17_trace_d7.xlsx"
+path_trace_m17 <- "~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m17/trace_days/m17_trace_d7.xlsx"
 t_stim_m17_d7 <- c(157, 2536)
 
 dat_stim_m17_d7 <- c_miniscope_matlab_d7(path_trace_m17, t_stim_m17_d7)
 
 ## for m18
-path_trace_m18 <- "~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m18/trace_days/m18_trace_d7.xlsx"
+path_trace_m18 <- "~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m18/trace_days/m18_trace_d7.xlsx"
 t_stim_m18_d7 <- c(124, 2238)
 
 dat_stim_m18_d7 <- c_miniscope_matlab_d7(path_trace_m18, t_stim_m18_d7)
 
 ## for m855
-path_trace_m855 <- "~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m855/trace_days/m855_trace_d7.xlsx"
+path_trace_m855 <- "~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m855/trace_days/m855_trace_d7.xlsx"
 t_stim_m855_d7 <- c(82, 3062)
 
 dat_stim_m855_d7 <- c_miniscope_matlab_d7(path_trace_m855, t_stim_m855_d7)
 
 ## for m857
-path_trace_m857 <- "~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m857/trace_days/m857_trace_d7.xlsx"
+path_trace_m857 <- "~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/matlab_analysis/m857/trace_days/m857_trace_d7.xlsx"
 t_stim_m857_d7 <- c(167*2, 1153*2)
 
 dat_stim_m857_d7 <- c_miniscope_matlab_d7(path_trace_m857, t_stim_m857_d7)
@@ -1163,15 +1163,16 @@ for (i in 1:length(dat_cell_trace)) {
 }
 
 score_range <- range(mapply(function(x) x$value, dat_cell_trace_re, SIMPLIFY = T))
+dat_trace_sta <- ddply(dat_cell_trace_re[[1]], .(variable, Group), summarise,mean=mean(value), sum=sum(value))
+dat_trace_sta <- dat_trace_sta[order(dat_trace_sta[,'mean']),]
 
 for (i in c(1:2)) {
   dat_trace <- dat_cell_trace_re[[i]]
-  dat_trace_sta <- ddply(dat_trace, .(variable, Group), summarise,mean=mean(value), sum=sum(value))
-  dat_trace_sta <- dat_trace_sta[order(dat_trace_sta[,'mean']),]
   dat_trace$variable <- factor(dat_trace$variable, levels = dat_trace_sta$variable)
+  
+
   p_heat <- ggplot(dat_trace, aes(Time, variable,fill= value))+ 
     geom_tile(height=2)+
-    facet_grid(rows = vars(Group), scales = "free_y")+
     #scale_fill_gradient2(limits= score_range,low = "navy", high = "red4", mid = "white")+
     scale_fill_gradientn(limits= score_range, colours = c("navy", "white", "red4"), values = rescale(c(score_range[1], 0, score_range[2])))+
     labs(x="Time relative to crossing (s)", y="Number of cells")+

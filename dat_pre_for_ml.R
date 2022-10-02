@@ -212,6 +212,7 @@ dat_train_array <- lapply(dat_cell_trace, function (x) x[[2]]) %>%
 ## 0 for non-placebo, 1 for placebo
 dat_train_array_label <- matrix(c(rep(0, length_pre), rep(1, length_placebo)))
 
+
 dat_test <- lapply(dat_cell_trace, function (x) x[[4]]) %>% 
   unlist() %>% 
   as.numeric() %>% 
