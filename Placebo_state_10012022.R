@@ -469,7 +469,8 @@ c_miniscope_matlab_ft <- function(file_trace) {
       mutate(sd_pool = sqrt(sd_cross^2 + sd_back^2)/sqrt(2)) %>% 
       mutate(sd_pool = ifelse(sd_pool < 1e-06, 1e-06, sd_pool)) %>% 
       mutate(d = (mean_cross - mean_back)/sd_pool) %>% 
-      dplyr::select(name, d) %>% 
+      mutate(d2 = d^2) %>% 
+      dplyr::select(name, d2) %>% 
       mutate(ID = ID)
     
     dat_stim_trace[[i]] <- dat_stim_combine
@@ -693,4 +694,581 @@ cairo_pdf("p_d_align.pdf", width = 120/25.6, height = 60/25.6, family = "Arial")
 p_d_align
 dev.off()
 
+## for d^2-----
+## with Fatih's suggestion to calculate the signed d
+back_crossing_frame <- tibble(ID_mouse = c("m3", "m7", "m17", "m18", "m855", "m857"), Frame_d3= c(2292, 498, 610, 535,1044,1770),
+                              Frame_d7 = c(1003, 1632, 2113,1923,1572,1892))
+c_miniscope_matlab_ft <- function(file_trace) {
+  ## import and format the data
+  dat_trace1 <- raveio::read_mat(file_trace)
+  ID <- str_extract(file_trace, regex("m\\d+"))
+  dat_trace1[[2]][1] <- ifelse(ID=="m857", 1694, dat_trace1[[2]][1])
+  num_compare <- c(4, 8)
+  t_crossing <- c(1, 5)
+  t_crossing_back <- back_crossing_frame %>% 
+    dplyr::filter(ID_mouse == ID) %>% 
+    dplyr::select(Frame_d3, Frame_d7) %>% 
+    unlist() %>% 
+    unname()
+  
+  
+  dat_stim_trace <- vector(mode = "list", length = length(num_compare))
+  
+  
+  for (i in seq_along(num_compare)) {
+    
+    dat_trace <- dat_trace1[[num_compare[i]]] %>% 
+      as_tibble() %>% 
+      apply(., 2, scale)
+    
+    ## number of rows to be binned
+    n <- 2 # 0.05*2=0.1
+    t1_p <- dat_trace1$crossing[t_crossing[i]]
+    t1_p_back <- t_crossing_back[i]
+    
+    ## extract cell activity when they cross the border
+    dat_stim1 <- dat_trace[(t1_p-40):(t1_p+40-1),] 
+    
+    dat_stim_cross <- aggregate(dat_stim1,list(rep(1:(nrow(dat_stim1)%/%n+1),each=n,len=nrow(dat_stim1))),mean)[-1]
+    colnames(dat_stim_cross) <- str_c(ID,"Cell", 1: ncol(dat_stim_cross))
+    
+    ## extract cell activity when cross back
+    dat_stim2 <- dat_trace[(t1_p_back-40):(t1_p_back+40-1),] 
+    
+    dat_stim_back <- aggregate(dat_stim2,list(rep(1:(nrow(dat_stim2)%/%n+1),each=n,len=nrow(dat_stim2))),mean)[-1]
+    colnames(dat_stim_back) <- str_c(ID,"Cell", 1: ncol(dat_stim_back))
+    ## calculate the d' of each cells
+    comp_time <- seq(-2, 1.9, by=0.1)
+    dat_stim_cross_sta <- dat_stim_cross %>% 
+      as_tibble() %>% 
+      add_column(Time = comp_time) %>% 
+      pivot_longer(-Time) %>% 
+      ddply(.,.(name), summarise,mean_cross=mean(value),sd_cross=sd(value))
+    
+    dat_stim_back_sta <- dat_stim_back %>% 
+      as_tibble() %>% 
+      add_column(Time = comp_time) %>% 
+      pivot_longer(-Time) %>% 
+      ddply(.,.(name), summarise,mean_back=mean(value),sd_back=sd(value))
+    
+    dat_stim_combine <- full_join(dat_stim_cross_sta, dat_stim_back_sta, by = 'name') %>% 
+      mutate(sd_pool = sqrt(sd_cross^2 + sd_back^2)/sqrt(2)) %>% 
+      mutate(sd_pool = ifelse(sd_pool < 1e-06, 1e-06, sd_pool)) %>% 
+      mutate(d = (mean_cross - mean_back)/sd_pool) %>% 
+      mutate(d2 = d^2) %>% 
+      dplyr::select(name, d2) %>% 
+      mutate(ID = ID)
+    
+    dat_stim_trace[[i]] <- dat_stim_combine
+    
+    
+  }
+  return(dat_stim_trace)
+}
 
+mouse_file <- as.list(list.files("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/FD-processed", full.names = T))
+
+dat_cell_trace <- mapply(c_miniscope_matlab_ft, mouse_file, SIMPLIFY = F)
+
+dat_cell_d_pre <- lapply(dat_cell_trace, function(x)  x[[1]]) %>% 
+  do.call(rbind,.) %>% 
+  mutate(Group = "Pre")
+
+dat_cell_d_combine <- lapply(dat_cell_trace, function(x)  x[[2]]) %>% 
+  do.call(rbind,.) %>% 
+  mutate(Group = "Post") %>% 
+  rbind(dat_cell_d_pre, .) %>% 
+  ddply(., .(ID, Group), summarise,n=length(d2),mean=mean(d2),sd=sd(d2),se=sd(d2)/sqrt(length(d2))) %>% 
+  mutate(Group = factor(Group, levels = c("Pre", "Post")))
+
+
+p_d_combine <- ggplot(dat_cell_d_combine, aes(Group, mean, group = Group))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_line(aes(group=ID), colour="gray90")+
+  geom_jitter(aes(colour = Group, shape = Group),width = 0.2,  size=2)+
+  labs(x="", y="(d')^2", title = "All cells, p = 0.03")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  # scale_y_continuous(limits = c(-0.5, 0.6))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+wilcox.test(mean~Group, dat_cell_d_combine, paired = T, alternative = "less")
+
+## compare by cells
+p_d_combine_cell <- lapply(dat_cell_trace, function(x)  x[[2]]) %>% 
+  do.call(rbind,.) %>% 
+  mutate(Group = "Post") %>% 
+  rbind(dat_cell_d_pre, .) %>% 
+  mutate(Group = factor(Group, levels = c("Pre", "Post"))) %>% 
+  ggplot(., aes(Group, d2, group = Group))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_jitter(aes(colour = Group, shape = Group),width = 0.2,  size=2)+
+  labs(x="", y="(d')^2", title = "All cells, p< 0.001")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  # scale_y_continuous(limits = c(-0.5, 0.6))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+t_combine_cells <- lapply(dat_cell_trace, function(x)  x[[2]]) %>% 
+  do.call(rbind,.) %>% 
+  mutate(Group = "Post") %>% 
+  rbind(dat_cell_d_pre, .) %>% 
+  mutate(Group = factor(Group, levels = c("Pre", "Post"))) %>% 
+  wilcox.test(d2~Group,.)
+  
+
+p_d_all <- plot_grid(p_d_combine, p_d_combine_cell, nrow = 1)
+
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_d_all.pdf", width = 120/25.6, height = 60/25.6, family = "Arial")
+p_d_all
+dev.off()
+
+## test for individual mouse
+t_d_mice <- lapply(dat_cell_trace, function(x)  x[[2]]) %>% 
+  do.call(rbind,.) %>% 
+  mutate(Group = "Post") %>% 
+  rbind(dat_cell_d_pre, .) %>% 
+  mutate(Group = factor(Group, levels = c("Pre", "Post"))) %>% 
+  filter(ID == "m857") %>% 
+  wilcox.test(d2~Group,.)
+
+## cross-day aligned neurons-----
+back_crossing_frame <- tibble(ID_mouse = c("m3", "m7", "m17", "m18", "m855", "m857"), Frame_d3= c(2292, 498, 610, 535,1044,1770),
+                              Frame_d7 = c(1003, 1632, 2113,1923,1572,1892))
+c_miniscope_matlab_ft <- function(file_trace) {
+  ## import and format the data
+  dat_trace1 <- raveio::read_mat(file_trace)
+  ID <- str_extract(file_trace, regex("m\\d+"))
+  dat_trace1[[2]][1] <- ifelse(ID=="m857", 1694, dat_trace1[[2]][1])
+  num_compare <- c(4, 8)
+  t_crossing <- c(1, 5)
+  t_crossing_back <- back_crossing_frame %>% 
+    dplyr::filter(ID_mouse == ID) %>% 
+    dplyr::select(Frame_d3, Frame_d7) %>% 
+    unlist() %>% 
+    unname()
+  
+  cross_ID <- dat_trace1$global_map %>% 
+    as_tibble() %>% 
+    select(V1, V5) %>% 
+    mutate_all(na_if, 0) %>% 
+    drop_na()
+  
+  
+  dat_stim_trace <- vector(mode = "list", length = length(num_compare))
+  
+  
+  for (i in seq_along(num_compare)) {
+    
+    global_cell <- pull(cross_ID[,i])
+    dat_trace <- dat_trace1[[num_compare[i]]] %>% 
+      as_tibble() %>% 
+      select(all_of(global_cell)) %>% 
+      apply(., 2, scale)
+    
+    ## number of rows to be binned
+    n <- 2 # 0.05*2=0.1
+    t1_p <- dat_trace1$crossing[t_crossing[i]]
+    t1_p_back <- t_crossing_back[i]
+    
+    ## extract cell activity when they cross the border
+    dat_stim1 <- dat_trace[(t1_p-40):(t1_p+40-1),] 
+    
+    dat_stim_cross <- aggregate(dat_stim1,list(rep(1:(nrow(dat_stim1)%/%n+1),each=n,len=nrow(dat_stim1))),mean)[-1]
+    colnames(dat_stim_cross) <- str_c(ID,"Cell", 1: ncol(dat_stim_cross))
+    
+    ## extract cell activity when cross back
+    dat_stim2 <- dat_trace[(t1_p_back-40):(t1_p_back+40-1),] 
+    
+    dat_stim_back <- aggregate(dat_stim2,list(rep(1:(nrow(dat_stim2)%/%n+1),each=n,len=nrow(dat_stim2))),mean)[-1]
+    colnames(dat_stim_back) <- str_c(ID,"Cell", 1: ncol(dat_stim_back))
+    ## calculate the d' of each cells
+    comp_time <- seq(-2, 1.9, by=0.1)
+    dat_stim_cross_sta <- dat_stim_cross %>% 
+      as_tibble() %>% 
+      add_column(Time = comp_time) %>% 
+      pivot_longer(-Time) %>% 
+      ddply(.,.(name), summarise,mean_cross=mean(value),sd_cross=sd(value))
+    
+    dat_stim_back_sta <- dat_stim_back %>% 
+      as_tibble() %>% 
+      add_column(Time = comp_time) %>% 
+      pivot_longer(-Time) %>% 
+      ddply(.,.(name), summarise,mean_back=mean(value),sd_back=sd(value))
+    
+    dat_stim_combine <- full_join(dat_stim_cross_sta, dat_stim_back_sta, by = 'name') %>% 
+      mutate(sd_pool = sqrt(sd_cross^2 + sd_back^2)/sqrt(2)) %>% 
+      mutate(sd_pool = ifelse(sd_pool < 1e-06, 1e-06, sd_pool)) %>% 
+      mutate(d = (mean_cross - mean_back)/sd_pool) %>% 
+      mutate(d2 = d^2) %>% 
+      dplyr::select(name, d2) %>% 
+      mutate(ID = ID)
+    
+    dat_stim_trace[[i]] <- dat_stim_combine
+    
+    
+  }
+  return(dat_stim_trace)
+}
+
+mouse_file <- as.list(list.files("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/FD-processed", full.names = T))
+
+dat_cell_trace <- mapply(c_miniscope_matlab_ft, mouse_file, SIMPLIFY = F)
+
+dat_cell_d_pre <- lapply(dat_cell_trace, function(x)  x[[1]]) %>% 
+  do.call(rbind,.) %>% 
+  mutate(Group = "Pre")
+
+dat_cell_d_combine <- lapply(dat_cell_trace, function(x)  x[[2]]) %>% 
+  do.call(rbind,.) %>% 
+  mutate(Group = "Post") %>% 
+  rbind(dat_cell_d_pre, .) %>% 
+  ddply(., .(ID, Group), summarise,n=length(d2),mean=mean(d2),sd=sd(d2),se=sd(d2)/sqrt(length(d2))) %>% 
+  mutate(Group = factor(Group, levels = c("Pre", "Post")))
+
+
+p_d_combine <- ggplot(dat_cell_d_combine, aes(Group, mean, group = Group))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_line(aes(group=ID), colour="gray90")+
+  geom_jitter(aes(colour = Group, shape = Group),width = 0.2,  size=2)+
+  labs(x="", y="(d')^2", title = "Aligned cells, p = 0.03")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  # scale_y_continuous(limits = c(-0.5, 0.6))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+wilcox.test(mean~Group, dat_cell_d_combine, paired = T, alternative = "less")
+
+## compare by cells
+p_d_combine_cell <- lapply(dat_cell_trace, function(x)  x[[2]]) %>% 
+  do.call(rbind,.) %>% 
+  mutate(Group = "Post") %>% 
+  rbind(dat_cell_d_pre, .) %>% 
+  mutate(Group = factor(Group, levels = c("Pre", "Post"))) %>% 
+  ggplot(., aes(Group, d2, group = Group))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_jitter(aes(colour = Group, shape = Group),width = 0.2,  size=2)+
+  labs(x="", y="(d')^2",title = "Aligned cells, p < 0.001" )+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  # scale_y_continuous(limits = c(-0.5, 0.6))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+t_d_combine_cell <- lapply(dat_cell_trace, function(x)  x[[2]]) %>% 
+  do.call(rbind,.) %>% 
+  mutate(Group = "Post") %>% 
+  rbind(dat_cell_d_pre, .) %>% 
+  mutate(Group = factor(Group, levels = c("Pre", "Post"))) %>% 
+  wilcox.test(d2~Group, ., paired = T, alternative = "less")
+
+p_d_align <- plot_grid(p_d_combine, p_d_combine_cell, nrow = 1)
+
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_d_align.pdf", width = 120/25.6, height = 60/25.6, family = "Arial")
+p_d_align
+dev.off()
+
+## test for individual mouse
+t_d_mice <- lapply(dat_cell_trace, function(x)  x[[2]]) %>% 
+  do.call(rbind,.) %>% 
+  mutate(Group = "Post") %>% 
+  rbind(dat_cell_d_pre, .) %>% 
+  mutate(Group = factor(Group, levels = c("Pre", "Post"))) %>% 
+  filter(ID == "m3") %>% 
+  wilcox.test(d2~Group, ., paired = T)
+
+
+## for permutation test----
+back_crossing_frame <- tibble(ID_mouse = c("m3", "m7", "m17", "m18", "m855", "m857"), Frame_d3= c(2292, 498, 610, 535,1044,1770),
+                              Frame_d7 = c(1003, 1632, 2113,1923,1572,1892))
+c_miniscope_matlab_ft <- function(file_trace) {
+  ## import and format the data
+  dat_trace1 <- raveio::read_mat(file_trace)
+  ID <- str_extract(file_trace, regex("m\\d+"))
+  dat_trace1[[2]][1] <- ifelse(ID=="m857", 1694, dat_trace1[[2]][1])
+  num_compare <- c(4, 8)
+  t_crossing <- c(1, 5)
+  t_crossing_back <- back_crossing_frame %>% 
+    dplyr::filter(ID_mouse == ID) %>% 
+    dplyr::select(Frame_d3, Frame_d7) %>% 
+    unlist() %>% 
+    unname()
+  
+  cell_port <- rep(0, 2)
+  
+  for (i in seq_along(num_compare)) {
+    
+    dat_trace <- dat_trace1[[num_compare[i]]] %>% 
+      as_tibble() %>% 
+      apply(., 2, scale)
+    
+    ## number of rows to be binned
+    n <- 2 # 0.05*2=0.1
+    t1_p <- dat_trace1$crossing[t_crossing[i]]
+    t1_p_back <- t_crossing_back[i]
+    
+    ## extract cell activity when they cross the border
+    dat_stim1 <- dat_trace[(t1_p-40):(t1_p+40-1),] 
+    
+    dat_stim_cross <- aggregate(dat_stim1,list(rep(1:(nrow(dat_stim1)%/%n+1),each=n,len=nrow(dat_stim1))),mean)[-1]
+    colnames(dat_stim_cross) <- str_c(ID,"Cell", 1: ncol(dat_stim_cross))
+    
+    ## extract cell activity when cross back
+    dat_stim2 <- dat_trace[(t1_p_back-40):(t1_p_back+40-1),] 
+    
+    dat_stim_back <- aggregate(dat_stim2,list(rep(1:(nrow(dat_stim2)%/%n+1),each=n,len=nrow(dat_stim2))),mean)[-1]
+    colnames(dat_stim_back) <- str_c(ID,"Cell", 1: ncol(dat_stim_back))
+    ## calculate the d' of each cells
+    comp_time <- seq(-2, 1.9, by=0.1)
+    dat_stim_cross_sta <- dat_stim_cross %>% 
+      as_tibble() 
+    
+    dat_stim_back_sta <- dat_stim_back %>% 
+      as_tibble() 
+    
+    dat_stim_combine <- rbind(dat_stim_cross_sta, dat_stim_back_sta) 
+    
+    cc_d_fun <- function(cell_acti, cell_treat) {
+      cell_mean_diff <- mean(cell_acti[cell_treat=="Cross"])-mean(cell_acti[cell_treat=="Cross_back"])
+      sd_pool <-  sqrt(sd(cell_acti[cell_treat=="Cross"])^2 + sd(cell_acti[cell_treat=="Cross_back"])^2)/sqrt(2)
+      sd_pool <- ifelse(sd_pool < 1e-06, 1e-06, sd_pool)
+      real_cell_d <- (cell_mean_diff/sd_pool)^2
+      return(real_cell_d)
+      
+    }
+    
+    cell_coding <- rep(0, ncol(dat_stim_combine))
+    ## for each neuron
+    for (j in c(1:ncol(dat_stim_combine))) {
+      cell_acti <- unname(unlist(dat_stim_combine[,j]))
+      cell_treat <- rep(c("Cross", "Cross_back"), each = length(comp_time))
+      
+      real_d <- cc_d_fun(cell_acti, cell_treat)
+      
+      cell_d_sh <- rep(0, 10000)
+      
+      for (k in c(1:10000)) {
+        cell_treat_sh <- sample(cell_treat)
+        cell_d_sh[k] <- cc_d_fun(cell_acti, cell_treat_sh)
+        
+      }
+      
+      big_value <- sum( cell_d_sh > real_d )
+      
+      cell_coding[j] <- ifelse(big_value > 100, "N", "Y")
+      
+    }
+    
+    cell_port[i] <- length(cell_coding[cell_coding=="Y"])/ncol(dat_stim_combine)
+    
+    
+  }
+  return(cell_port)
+}
+
+
+
+mouse_file <- as.list(list.files("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/FD-processed", full.names = T))
+
+dat_cell_trace <- mapply(c_miniscope_matlab_ft, mouse_file)
+
+p_cell_coding <- dat_cell_trace %>% 
+  t() %>% 
+  as_tibble() %>% 
+  rename(Pre = V1, Post = V2) %>% 
+  add_column(ID = sort(c("m3", "m7", "m17", "m18", "m855", "m857"))) %>% 
+  pivot_longer(-ID) %>% 
+  mutate(value = value *100) %>% 
+  mutate(name = factor(name, levels = c("Pre", "Post"))) %>% 
+  ggplot(., aes(name, value, group= name))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_line(aes(group=ID), colour="gray90")+
+  geom_jitter(aes(colour = name, shape = name),width = 0.2,  size=2)+
+  labs(x="", y="Proportion of coding cells (%)", title = "All cells, p = 0.03")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  # scale_y_continuous(limits = c(-0.5, 0.6))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+t_cell_coding <- dat_cell_trace %>% 
+  t() %>% 
+  as_tibble() %>% 
+  rename(Pre = V1, Post = V2) %>% 
+  add_column(ID = sort(c("m3", "m7", "m17", "m18", "m855", "m857"))) %>% 
+  pivot_longer(-ID) %>% 
+  mutate(value = value *100) %>% 
+  mutate(name = factor(name, levels = c("Pre", "Post"))) %>% 
+  wilcox.test(value~name, ., paired = T, alternative = "less" )
+
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_cell_coding_all.pdf", width = 60/25.6, height = 60/25.6, family = "Arial")
+p_cell_coding
+dev.off()
+
+
+## For coding cell with all aligned neurons-----
+
+back_crossing_frame <- tibble(ID_mouse = c("m3", "m7", "m17", "m18", "m855", "m857"), Frame_d3= c(2292, 498, 610, 535,1044,1770),
+                              Frame_d7 = c(1003, 1632, 2113,1923,1572,1892))
+c_miniscope_matlab_ft <- function(file_trace) {
+  ## import and format the data
+  dat_trace1 <- raveio::read_mat(file_trace)
+  ID <- str_extract(file_trace, regex("m\\d+"))
+  dat_trace1[[2]][1] <- ifelse(ID=="m857", 1694, dat_trace1[[2]][1])
+  num_compare <- c(4, 8)
+  t_crossing <- c(1, 5)
+  t_crossing_back <- back_crossing_frame %>% 
+    dplyr::filter(ID_mouse == ID) %>% 
+    dplyr::select(Frame_d3, Frame_d7) %>% 
+    unlist() %>% 
+    unname()
+  
+  cross_ID <- dat_trace1$global_map %>% 
+    as_tibble() %>% 
+    select(V1, V5) %>% 
+    mutate_all(na_if, 0) %>% 
+    drop_na()
+  
+  cell_port <- rep(0, 2)
+  
+  for (i in seq_along(num_compare)) {
+    
+    global_cell <- pull(cross_ID[,i])
+    dat_trace <- dat_trace1[[num_compare[i]]] %>% 
+      as_tibble() %>% 
+      select(all_of(global_cell)) %>% 
+      apply(., 2, scale)
+    
+    ## number of rows to be binned
+    n <- 2 # 0.05*2=0.1
+    t1_p <- dat_trace1$crossing[t_crossing[i]]
+    t1_p_back <- t_crossing_back[i]
+    
+    ## extract cell activity when they cross the border
+    dat_stim1 <- dat_trace[(t1_p-40):(t1_p+40-1),] 
+    
+    dat_stim_cross <- aggregate(dat_stim1,list(rep(1:(nrow(dat_stim1)%/%n+1),each=n,len=nrow(dat_stim1))),mean)[-1]
+    colnames(dat_stim_cross) <- str_c(ID,"Cell", 1: ncol(dat_stim_cross))
+    
+    ## extract cell activity when cross back
+    dat_stim2 <- dat_trace[(t1_p_back-40):(t1_p_back+40-1),] 
+    
+    dat_stim_back <- aggregate(dat_stim2,list(rep(1:(nrow(dat_stim2)%/%n+1),each=n,len=nrow(dat_stim2))),mean)[-1]
+    colnames(dat_stim_back) <- str_c(ID,"Cell", 1: ncol(dat_stim_back))
+    ## calculate the d' of each cells
+    comp_time <- seq(-2, 1.9, by=0.1)
+    dat_stim_cross_sta <- dat_stim_cross %>% 
+      as_tibble() 
+    
+    dat_stim_back_sta <- dat_stim_back %>% 
+      as_tibble() 
+    
+    dat_stim_combine <- rbind(dat_stim_cross_sta, dat_stim_back_sta) 
+    
+    cc_d_fun <- function(cell_acti, cell_treat) {
+      cell_mean_diff <- mean(cell_acti[cell_treat=="Cross"])-mean(cell_acti[cell_treat=="Cross_back"])
+      sd_pool <-  sqrt(sd(cell_acti[cell_treat=="Cross"])^2 + sd(cell_acti[cell_treat=="Cross_back"])^2)/sqrt(2)
+      sd_pool <- ifelse(sd_pool < 1e-06, 1e-06, sd_pool)
+      real_cell_d <- (cell_mean_diff/sd_pool)^2
+      return(real_cell_d)
+      
+    }
+    
+    cell_coding <- rep(0, ncol(dat_stim_combine))
+    ## for each neuron
+    for (j in c(1:ncol(dat_stim_combine))) {
+      cell_acti <- unname(unlist(dat_stim_combine[,j]))
+      cell_treat <- rep(c("Cross", "Cross_back"), each = length(comp_time))
+      
+      real_d <- cc_d_fun(cell_acti, cell_treat)
+      
+      cell_d_sh <- rep(0, 10000)
+      
+      for (k in c(1:10000)) {
+        cell_treat_sh <- sample(cell_treat)
+        cell_d_sh[k] <- cc_d_fun(cell_acti, cell_treat_sh)
+        
+      }
+      
+      big_value <- sum( cell_d_sh > real_d )
+      
+      cell_coding[j] <- ifelse(big_value > 100, "N", "Y")
+      
+    }
+    
+    cell_port[i] <- length(cell_coding[cell_coding=="Y"])/ncol(dat_stim_combine)
+    
+    
+  }
+  return(cell_port)
+}
+
+
+
+mouse_file <- as.list(list.files("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/FD-processed", full.names = T))
+
+dat_cell_trace <- mapply(c_miniscope_matlab_ft, mouse_file)
+
+p_cell_coding <- dat_cell_trace %>% 
+  t() %>% 
+  as_tibble() %>% 
+  rename(Pre = V1, Post = V2) %>% 
+  add_column(ID = sort(c("m3", "m7", "m17", "m18", "m855", "m857"))) %>% 
+  pivot_longer(-ID) %>% 
+  mutate(value = value *100) %>% 
+  mutate(name = factor(name, levels = c("Pre", "Post"))) %>% 
+  ggplot(., aes(name, value, group= name))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_line(aes(group=ID), colour="gray90")+
+  geom_jitter(aes(colour = name, shape = name),width = 0.2,  size=2)+
+  labs(x="", y="Proportion of coding cells (%)", title = "Aligned cells, p = 0.05")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  # scale_y_continuous(limits = c(-0.5, 0.6))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+t_cell_coding <- dat_cell_trace %>% 
+  t() %>% 
+  as_tibble() %>% 
+  rename(Pre = V1, Post = V2) %>% 
+  add_column(ID = sort(c("m3", "m7", "m17", "m18", "m855", "m857"))) %>% 
+  pivot_longer(-ID) %>% 
+  mutate(value = value *100) %>% 
+  mutate(name = factor(name, levels = c("Pre", "Post"))) %>% 
+  wilcox.test(value~name, ., paired = T, alternative = "less" )
+
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_cell_coding_align.pdf", width = 60/25.6, height = 60/25.6, family = "Arial")
+p_cell_coding
+dev.off()
