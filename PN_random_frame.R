@@ -156,5 +156,97 @@ p_test <- ggplot(dat_cell_trace_test_random_sta, aes(Time, mean_test,  colour = 
   geom_vline(xintercept = 0, col= 'red', linetype=2)
   
 
+## random crossing with data from Fatih, placebo state---------
+c_miniscope_matlab_ft <- function(file_trace) {
+  ## import and format the data
+  dat_trace1 <- raveio::read_mat(file_trace)
+  ID <- str_extract(file_trace, regex("m\\d+"))
+  num_compare <- c(4,7, 8)
+  length_pre <- dat_trace1[[4]] %>% 
+    nrow()
+  t_crossing_pre <- sample(c(40:(length_pre-40)), 100)
+  
+  length_cond <- dat_trace1[[7]] %>% 
+    nrow()
+  t_crossing_cond <- sample(c(40:(length_cond-40)), 100)
+  
+  length_post <- dat_trace1[[8]] %>% 
+    nrow()
+  t_crossing_post <- sample(c(40:(length_post-40)), 100)
+  
+  t_crossing <- list(t_crossing_pre, t_crossing_cond, t_crossing_post)
+  
+  cross_ID <- dat_trace1$global_map %>% 
+    as_tibble() %>% 
+    select(V1, V4, V5) %>% 
+    mutate_all(na_if, 0) %>% 
+    drop_na()
+  
+  dat_stim_trace <- rep(0, length(num_compare))
+  
+  
+  for (i in seq_along(num_compare)) {
+    global_cell <- pull(cross_ID[,i])
+    dat_trace <- dat_trace1[[num_compare[i]]] %>% 
+      as_tibble() %>% 
+      select(all_of(global_cell)) %>% 
+      apply(., 2, scale)
+    
+    ## number of rows to be binned
+    n <- 2 # 0.05*2=0.1
+    
+    t_crossing_day <- t_crossing[[i]]
+    t_crossing_mean <- rep(0, 100)
+    
+    for (j in seq_along(t_crossing_day)){
+      t1_p <- t_crossing_day[j]
+      ## extract cell activity when they cross the border
+      #dat_stim1 <- dat_trace[(t1_p-40):(t1_p+140-1),] 
+      dat_stim1 <- dat_trace[(t1_p-40):(t1_p+40-1),] 
+      
+      dat_stim <- aggregate(dat_stim1,list(rep(1:(nrow(dat_stim1)%/%n+1),each=n,len=nrow(dat_stim1))),mean)[-1] %>% 
+        apply(., 2, mean) %>% 
+        mean()
+     
+     t_crossing_mean[j] <- dat_stim    
+      
+      
+    }
 
+    dat_stim_trace[i] <- mean(t_crossing_mean)
 
+  }
+  return(dat_stim_trace)
+}
+
+mouse_file <- as.list(list.files("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/FD-processed", full.names = T))
+
+dat_cell_trace <- mapply(c_miniscope_matlab_ft, mouse_file, SIMPLIFY = F)
+
+p_random <- dat_cell_trace %>% 
+  do.call(rbind,.) %>% 
+  as_tibble() %>% 
+  rename(Pre =V1, Cond= V2, Post = V3) %>% 
+  mutate(ID = sort(c("m3", "m7", "m17", "m18", "m855", "m857"))) %>% 
+  pivot_longer(-ID) %>%
+  mutate(name = factor(name, levels = c("Pre", "Cond", "Post"))) %>% 
+  ggplot(., aes(name, value, color = name))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_line(aes(group=ID), colour="gray90")+
+  geom_jitter(aes(colour = name, shape = name),width = 0.2,  size=2)+
+  scale_color_manual(values=c("#8491B4FF", "#00A087FF", "#3C5488FF"))+
+  labs(x="", y="Population activity (∆F/F)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  scale_y_continuous(limits = c(-0.3, 0.6))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_random_crossings.pdf", width = 50/25.6, height = 65/25.6, family = "Arial")
+p_random
+dev.off()

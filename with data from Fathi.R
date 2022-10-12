@@ -810,8 +810,8 @@ c_miniscope_matlab_ft <- function(file_trace) {
   
   for (i in seq_along(num_compare)) {
     dat_trace <- dat_trace1[[num_compare[i]]] %>% 
-      as_tibble() %>% 
-      apply(., 2, scale)
+      as_tibble()
+      #apply(., 2, scale)
     
     ## number of rows to be binned
     n <- 2 # 0.05*2=0.1
@@ -961,13 +961,6 @@ p_heat <- plot_grid(p_dat_cell_d3, p_dat_cell_d6, p_dat_cell_d7, ncol = 3)
   
   
 ## calculate population activity
-
-p_trace <- rbind(dat_cell_trace_combine_d3, dat_cell_trace_combine_d6, dat_cell_trace_combine_d7) %>% 
-  ddply(., .(Time, Group),summarise,n=length(value),mean_acti=mean(value),sd=sd(value),se=sd(value)/sqrt(length(value))) %>% 
-  ddply(., .(Group), summarise,mean = sum(mean_acti)) %>% 
-  mutate(Group = factor(Group, levels = c("Pre", "Cond", "Post"))) %>% 
-  ggplot(., aes(Group,  mean, fill = Group))+
-  geom_bar(stat="identity", color="black", position=position_dodge())
 
 
 p_trace <- rbind(dat_cell_trace_combine_d3, dat_cell_trace_combine_d6, dat_cell_trace_combine_d7) %>% 
@@ -1895,6 +1888,7 @@ dat_cell_trace <- mapply(c_miniscope_matlab_ft, mouse_file, SIMPLIFY = F)
 p_ca_crossing <- dat_cell_trace %>% 
   do.call(rbind,.) %>% 
   as_tibble() %>% 
+  filter(Latency_cross < 150) %>% 
   ggplot(., aes(cell_acti, Latency_cross))+
   geom_point()+
   geom_smooth(method = "lm")+
@@ -1914,7 +1908,8 @@ dev.off()
 
 p_cor <-  dat_cell_trace %>% 
   do.call(rbind,.) %>% 
-  as_tibble()
+  as_tibble() %>% 
+  filter(Latency_cross < 150) 
 
 cor.test(p_cor$cell_acti, p_cor$Latency_cross)  
 
