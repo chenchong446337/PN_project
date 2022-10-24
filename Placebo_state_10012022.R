@@ -169,7 +169,7 @@ p_test <- lapply(dat_acti_combine, function(x) x[[1]]) %>%
 
 summary(p_test)
 
-
+dat_anti_sta <- 
 
 dat_cell_acti <- lapply(dat_acti_combine, function(x) x[[1]]) %>% 
   do.call(rbind,.) %>% 
@@ -178,9 +178,61 @@ dat_cell_acti <- lapply(dat_acti_combine, function(x) x[[1]]) %>%
 pairwise.t.test(dat_cell_acti$cell_acti, dat_cell_acti$Group, paired = T, alternative = "greater")
 
 setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
-cairo_pdf("p_dat_anti.pdf", width = 50/25.6, height = 65/25.6, family = "Arial")
+cairo_pdf("p_dat_anti.pdf", width = 50/25.6, height = 60/25.6, family = "Arial")
 p_dat_anti
 dev.off()
+
+## compare all activity by all cells
+dat_cell_pre_trace <- lapply(dat_cell_trace, function(x) x[[1]]) %>% 
+  do.call(cbind,.) %>% 
+  add_column(Group = "Pre")
+
+dat_cell_cond_trace <- lapply(dat_cell_trace, function(x) x[[2]]) %>% 
+  do.call(cbind,.) %>% 
+  add_column(Group = "Cond")
+
+p_cell_acti <- lapply(dat_cell_trace, function(x) x[[3]]) %>% 
+  do.call(cbind,.) %>% 
+  add_column(Group = "Post") %>% 
+  rbind(dat_cell_pre_trace, dat_cell_cond_trace,.) %>%
+  mutate(Group = factor(Group, levels = c("Pre", "Cond", "Post"))) %>% 
+  pivot_longer(-Group) %>% 
+  ddply(., .(name, Group), summarise, mean_acti = mean(value)) %>% 
+  ggplot(., aes(Group, mean_acti, group = Group))+
+  geom_violin()+
+  geom_jitter(aes(colour = Group, shape = Group),width = 0.2,  size=2, alpha= 0.3)+
+  scale_color_manual(values=c("#8491B4FF", "#00A087FF", "#3C5488FF"))+
+  labs(x="", y="Population activity (∆F/F)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  scale_y_continuous(limits = c(-1, 6))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+p_acti_combine <- plot_grid( p_cell_acti,p_dat_anti, nrow = 1)
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_acti_combine.pdf", width = 80/25.6, height = 60/25.6, family = "Arial")
+p_acti_combine
+dev.off()
+
+t_cell_acti <- lapply(dat_cell_trace, function(x) x[[3]]) %>% 
+  do.call(cbind,.) %>% 
+  add_column(Group = "Post") %>% 
+  rbind(dat_cell_pre_trace, dat_cell_cond_trace,.) %>%
+  mutate(Group = factor(Group, levels = c("Pre", "Cond", "Post"))) %>% 
+  pivot_longer(-Group) %>% 
+  ddply(., .(name, Group), summarise, mean_acti = mean(value)) %>% 
+  aov(mean_acti~Group,.)
+
+summary(t_cell_acti)
+TukeyHSD(t_cell_acti, ordered = T)
+
+pairwise.t.test(t_cell_acti$mean_acti, t_cell_acti$Group, paired = T, alternative = "greater")
+
 
 ## compare cells show increased activity
 p_cell_portion <- lapply(dat_acti_combine, function(x) x[[2]]) %>% 
@@ -238,7 +290,7 @@ ggvenn::ggvenn(dat_overlap,  c("Pre", "Cond", "Post"), fill_color = c("#8491B4FF
 
 ## compare crossing, back-crossing and last crossing---------
 back_crossing_frame <- tibble(ID = c("m3", "m7", "m17", "m18", "m855", "m857"), Frame = c(1003, 1632, 2113,1923,1572,1892), 
-                              Last_frame= c(1756, 2777, 2536, 2238, 3062, 2306))
+                              Last_frame= c(1756, 2777, 2536, 2238, 3062, 2306)) ## m3, last one 3942
 
 c_miniscope_matlab_ft <- function(file_trace) {
   ## import and format the data
@@ -388,10 +440,6 @@ p_dat_anti_cross <- lapply(dat_acti_combine, function(x) x[[1]]) %>%
   scale_y_continuous(limits = c(-0.5, 0.6))+
   theme(legend.title = element_blank(), legend.position = "none")
 
-setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
-cairo_pdf("p_dat_anti_cross.pdf", width = 50/25.6, height = 65/25.6, family = "Arial")
-p_dat_anti_cross
-dev.off()
 
 
 p_test <- lapply(dat_acti_combine, function(x) x[[1]]) %>% 
@@ -408,6 +456,57 @@ dat_cell_acti <- lapply(dat_acti_combine, function(x) x[[1]]) %>%
 
 pairwise.t.test(dat_cell_acti$cell_acti, dat_cell_acti$Group, paired = T, alternative = "less")
 
+## compare for each cells
+p_cell_firing_corssing <- lapply(dat_cell_trace, function(x)  x[[1]]) %>% 
+  do.call(cbind,.) %>% 
+  add_column(Group = "Crossing")
+
+p_cell_firing_corssing_back <- lapply(dat_cell_trace, function(x)  x[[2]]) %>% 
+  do.call(cbind,.) %>% 
+  add_column(Group = "Crossing_back")
+
+p_cell_firing <-  lapply(dat_cell_trace, function(x)  x[[3]]) %>% 
+  do.call(cbind,.) %>% 
+  add_column(Group = "Last_crossing") %>% 
+  rbind(p_cell_firing_corssing, p_cell_firing_corssing_back,.) %>% 
+  as_tibble() %>% 
+  pivot_longer(-Group) %>% 
+  ddply(.,.(Group, name), summarise, mean = mean(value)) %>% 
+  mutate(Group = factor(Group, levels = c("Crossing", "Crossing_back", "Last_crossing"))) %>% 
+  ggplot(., aes(Group, mean, group = Group))+
+  geom_violin()+
+  geom_jitter(aes(colour = Group, shape = Group),width = 0.2,  size=2, alpha = 0.3)+
+  #scale_color_manual(values=c("#8491B4FF", "#00A087FF", "#3C5488FF"))+
+  labs(x="", y="Population activity (∆F/F)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  scale_y_continuous(limits = c(-1, 6))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+t_cell_firing <-  lapply(dat_cell_trace, function(x)  x[[3]]) %>% 
+  do.call(cbind,.) %>% 
+  add_column(Group = "Last_crossing") %>% 
+  rbind(p_cell_firing_corssing, p_cell_firing_corssing_back,.) %>% 
+  as_tibble() %>% 
+  pivot_longer(-Group) %>% 
+  ddply(.,.(Group, name), summarise, mean = mean(value)) %>%
+  mutate(Group = factor(Group, levels = c("Crossing", "Crossing_back", "Last_crossing"))) %>% 
+  aov(mean~Group,.)
+
+summary(t_cell_firing)
+TukeyHSD(t_cell_firing)
+
+
+p_d7_combin <- plot_grid(p_cell_firing, p_dat_anti_cross, nrow = 1)
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_dat_firing_d7.pdf", width = 80/25.6, height = 60/25.6, family = "Arial" )
+p_d7_combin
+dev.off()
 
 ## with Fatih's suggestion to calculate the signed d------
 back_crossing_frame <- tibble(ID_mouse = c("m3", "m7", "m17", "m18", "m855", "m857"), Frame_d3= c(2292, 498, 610, 535,1044,1770),
@@ -941,6 +1040,7 @@ p_d_combine <- ggplot(dat_cell_d_combine, aes(Group, mean, group = Group))+
   geom_boxplot(outlier.shape = NA)+
   geom_line(aes(group=ID), colour="gray90")+
   geom_jitter(aes(colour = Group, shape = Group),width = 0.2,  size=2)+
+  scale_color_manual(values=c("#8491B4FF", "#3C5488FF"))+
   labs(x="", y="(d')^2")+
   theme(axis.line.x = element_line(),
         axis.line.y = element_line(),
@@ -963,6 +1063,7 @@ p_d_combine_cell <- lapply(dat_cell_trace, function(x)  x[[2]]) %>%
   ggplot(., aes(Group, d2, group = Group))+
   geom_violin( )+
   geom_jitter(aes(colour = Group, shape = Group),width = 0.2,  size=2, alpha = 0.3 )+
+  scale_color_manual(values=c("#8491B4FF", "#3C5488FF"))+
   labs(x="", y="(d')^2" )+
   theme(axis.line.x = element_line(),
         axis.line.y = element_line(),
@@ -1891,3 +1992,301 @@ cairo_pdf("p_number.pdf", width = 30/25.6, height = 60/25.6, family = "Arial")
 p_number
 dev.off()
 
+## with new data-----
+c_miniscope_matlab_ft <- function(file_trace) {
+  ## import and format the data
+  dat_trace1 <- raveio::read_mat(file_trace)
+  ID <- str_extract(file_trace, regex("m\\d+"))
+  while (length(dat_trace1)< 8) {
+    dat_trace1 <-lapply(rapply(dat_trace1, enquote, how="unlist"), eval)
+    ref <- list(c(0,0))
+    dat_trace1 <- append(ref, dat_trace1)
+    names(dat_trace1)[3] = "global_map"
+    
+  }
+  dat_trace1[[2]][1] <- ifelse(ID=="m857", 1694, dat_trace1[[2]][1])
+  num_compare <- c(4,7, 8)
+  t_crossing <- c(1,4, 5)
+  
+  cross_ID <- dat_trace1$global_map %>% 
+    as_tibble() %>% 
+    select(V1, V4, V5) %>% 
+    mutate_all(na_if, 0) %>% 
+    drop_na()
+  
+  dat_stim_trace <- vector(mode = "list", length = length(num_compare))
+  
+  
+  for (i in seq_along(num_compare)) {
+    global_cell <- pull(cross_ID[,i])
+    dat_trace <- dat_trace1[[num_compare[i]]] %>% 
+      as_tibble() %>% 
+      select(all_of(global_cell)) %>% 
+      apply(., 2, scale)
+    
+    ## number of rows to be binned
+    n <- 2 # 0.05*2=0.1
+    t1_p <- dat_trace1$crossing[t_crossing[i]]
+    ## extract cell activity when they cross the border
+    #dat_stim1 <- dat_trace[(t1_p-40):(t1_p+140-1),] 
+    dat_stim1 <- dat_trace[(t1_p-40):(t1_p+40-1),] 
+    
+    dat_stim <- aggregate(dat_stim1,list(rep(1:(nrow(dat_stim1)%/%n+1),each=n,len=nrow(dat_stim1))),mean)[-1]
+    # apply(., 2, scale) %>% 
+    # as_tibble() %>% 
+    # replace(is.na(.), 0)
+    
+    
+    colnames(dat_stim) <- str_c(ID,"Cell", 1: ncol(dat_stim))
+    dat_stim_trace[[i]] <- dat_stim
+  }
+  return(dat_stim_trace)
+}
+
+
+## analyze for all mouse 
+mouse_file <- as.list(list.files("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/FD-processed", full.names = T))
+
+dat_cell_trace <- mapply(c_miniscope_matlab_ft, mouse_file, SIMPLIFY = F)
+
+## heatmap plot the activity, ordered by cell activity
+comp_time <- seq(-2, 1.9, by=0.1)
+group_day <- c("Pre", "Cond", "Post")
+score_range <- range(dat_cell_trace)
+
+for(i in c(1:3)){
+  cell_order <- lapply(dat_cell_trace, function(x)  x[[i]]) %>% 
+    do.call(cbind,.) %>% 
+    mutate(Time = comp_time) %>% 
+    pivot_longer(-Time) %>% 
+    ddply(.,.(name), summarise, mean = mean(value)) %>% 
+    arrange(mean)
+  
+  p_heat <- lapply(dat_cell_trace, function(x)  x[[i]]) %>% 
+    do.call(cbind,.) %>% 
+    mutate(Time = comp_time) %>% 
+    pivot_longer(-Time) %>% 
+    mutate(name = factor(name, levels = cell_order$name)) %>% 
+    ggplot(., aes(Time, name,fill= value))+ 
+    geom_tile(height=2)+
+    scale_fill_gradientn(limits= score_range, colours = c("navy", "white", "red4"), values = rescale(c(score_range[1], 0, score_range[2])))+
+    labs(x="", y="")+
+    geom_vline(xintercept = 0, col= 'red', linetype=2)+
+    theme(axis.line.x = element_line(),
+          axis.line.y = element_line(),
+          axis.text.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank(),
+          panel.border = element_blank(),
+          panel.background = element_blank(),
+          axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+    theme(legend.position = "none")
+  assign(str_c("p_heat_", group_day[i]), p_heat)
+  
+}
+
+p_heat <- plot_grid(p_heat_Pre, p_heat_Cond, p_heat_Post, nrow  = 1)
+
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_heat.pdf", width = 140/25.6, height = 60/25.6, family = "Arial")
+p_heat
+dev.off()
+
+## calculate cell activity change mouse by mouse (cell becomes more active)
+cc_active_fun <- function (dat_trace){
+  m_id <- dat_trace[[1]] %>% 
+    colnames() %>%
+    .[1] %>% 
+    str_extract(., regex("m\\d+"))
+  
+  dat_trace_combine <- dat_trace %>% 
+    do.call(rbind,.) %>% 
+    as_tibble() %>% 
+    add_column(Time = rep(comp_time, 3)) %>% 
+    add_column(Group = rep(c("Pre", "Cond", "Post"), each = length(comp_time))) %>% 
+    pivot_longer(-c(Time, Group)) 
+  
+  dat_trace_acti <- dat_trace_combine %>% 
+    ddply(., .(name, Group), summarise, mean_acti = mean(value)) %>% 
+    ddply(., .(Group), summarise, cell_acti = mean(mean_acti)) %>% 
+    add_column(ID = m_id)
+  
+  # calculate percentage of cell numer increased activity
+  ratio_pre_con <- dat_trace_combine %>% 
+    ddply(., .(name, Group), summarise, mean_acti = mean(value)) %>% 
+    pivot_wider(., names_from = Group, values_from = mean_acti) %>% 
+    mutate(diff = Cond - Pre) %>% 
+    dplyr::filter(diff > 0)
+  
+  ratio_pre_post <- dat_trace_combine %>% 
+    ddply(., .(name, Group), summarise, mean_acti = mean(value)) %>% 
+    pivot_wider(., names_from = Group, values_from = mean_acti) %>% 
+    mutate(diff = Post - Pre) %>% 
+    dplyr::filter(diff > 0)
+  
+  ratio_con_post <- dat_trace_combine %>% 
+    ddply(., .(name, Group), summarise, mean_acti = mean(value)) %>% 
+    pivot_wider(., names_from = Group, values_from = mean_acti) %>% 
+    mutate(diff = Post - Cond) %>% 
+    dplyr::filter(diff > 0)
+  
+  
+  dat_ratio <- c(nrow(ratio_pre_con), nrow(ratio_pre_post), nrow(ratio_con_post))/ncol(dat_trace[[1]])
+  
+  name_con_pre <- ratio_pre_con$name
+  name_post_pre <- ratio_pre_post$name
+  name_post_con <- ratio_con_post$name
+  return(list(dat_trace_acti, dat_ratio, name_con_pre, name_post_pre, name_post_con))
+}
+
+
+dat_acti_combine <- mapply(cc_active_fun, dat_cell_trace, SIMPLIFY = F)
+
+p_dat_anti <- lapply(dat_acti_combine, function(x) x[[1]]) %>% 
+  do.call(rbind,.) %>% 
+  mutate(Group = factor(Group, levels = c("Pre", "Cond", "Post"))) %>% 
+  ggplot(., aes(Group, cell_acti, group = Group))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_line(aes(group=ID), colour="gray90")+
+  geom_jitter(aes(colour = Group, shape = Group),width = 0.2,  size=2)+
+  scale_color_manual(values=c("#8491B4FF", "#00A087FF", "#3C5488FF"))+
+  labs(x="", y="Population activity (∆F/F)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  scale_y_continuous(limits = c(-0.3, 0.6))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+p_test <- lapply(dat_acti_combine, function(x) x[[1]]) %>% 
+  do.call(rbind,.) %>% 
+  mutate(Group = factor(Group, levels = c("Pre", "Cond", "Post"))) %>% 
+  aov(cell_acti~ Group,.)
+
+summary(p_test)
+TukeyHSD(p_test)
+
+
+dat_cell_acti <- lapply(dat_acti_combine, function(x) x[[1]]) %>% 
+  do.call(rbind,.) %>% 
+  mutate(Group = factor(Group, levels = c("Pre", "Cond", "Post")))
+
+pairwise.t.test(dat_cell_acti$cell_acti, dat_cell_acti$Group, paired = T, alternative = "greater")
+
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_dat_anti.pdf", width = 50/25.6, height = 60/25.6, family = "Arial")
+p_dat_anti
+dev.off()
+
+## compare all activity by all cells
+dat_cell_pre_trace <- lapply(dat_cell_trace, function(x) x[[1]]) %>% 
+  do.call(cbind,.) %>% 
+  add_column(Group = "Pre")
+
+dat_cell_cond_trace <- lapply(dat_cell_trace, function(x) x[[2]]) %>% 
+  do.call(cbind,.) %>% 
+  add_column(Group = "Cond")
+
+p_cell_acti <- lapply(dat_cell_trace, function(x) x[[3]]) %>% 
+  do.call(cbind,.) %>% 
+  add_column(Group = "Post") %>% 
+  rbind(dat_cell_pre_trace, dat_cell_cond_trace,.) %>%
+  mutate(Group = factor(Group, levels = c("Pre", "Cond", "Post"))) %>% 
+  pivot_longer(-Group) %>% 
+  ddply(., .(name, Group), summarise, mean_acti = mean(value)) %>% 
+  ggplot(., aes(Group, mean_acti, group = Group))+
+  geom_violin()+
+  geom_jitter(aes(colour = Group, shape = Group),width = 0.2,  size=2, alpha= 0.3)+
+  scale_color_manual(values=c("#8491B4FF", "#00A087FF", "#3C5488FF"))+
+  labs(x="", y="Population activity (∆F/F)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  scale_y_continuous(limits = c(-1, 6))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+p_acti_combine <- plot_grid( p_cell_acti,p_dat_anti, nrow = 1)
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_acti_combine.pdf", width = 80/25.6, height = 60/25.6, family = "Arial")
+p_acti_combine
+dev.off()
+
+t_cell_acti <- lapply(dat_cell_trace, function(x) x[[3]]) %>% 
+  do.call(cbind,.) %>% 
+  add_column(Group = "Post") %>% 
+  rbind(dat_cell_pre_trace, dat_cell_cond_trace,.) %>%
+  mutate(Group = factor(Group, levels = c("Pre", "Cond", "Post"))) %>% 
+  pivot_longer(-Group) %>% 
+  ddply(., .(name, Group), summarise, mean_acti = mean(value)) %>% 
+  aov(mean_acti~Group,.)
+
+summary(t_cell_acti)
+TukeyHSD(t_cell_acti, ordered = T)
+
+pairwise.t.test(t_cell_acti$mean_acti, t_cell_acti$Group, paired = T, alternative = "greater")
+
+## plot the cell number across days-----
+num_pre <- c(74, 55, 35, 45, 89, 42)
+num_cond <- c(68, 53, 36, 41, 87, 29)
+num_post <- c(82, 62, 27, 42, 82, 24)
+num_aligned = c(48, 36, 19, 25, 58, 19)
+
+dat_num <- tibble(Pre = num_pre, Cond = num_cond, Post = num_post, Align = num_aligned) %>% 
+  add_column(ID = c("m3", "m7", "m17", "m18", "m855", "m857")) %>%
+  pivot_longer(-ID) %>% 
+  mutate(name = factor(name, levels = c("Pre", "Cond", "Post", "Align"))) %>% 
+  ggplot(., aes(name, value, group = name))+
+  geom_boxplot(outlier.shape = NA)+
+  #geom_line(aes(group=ID), colour="gray90")+
+  geom_jitter(aes(colour = name, shape = name),width = 0.2,  size=2)+
+  scale_color_manual(values=c("#8491B4FF", "#00A087FF", "#3C5488FF", "violetred3"))+
+  labs(x="", y="No. of cells")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  scale_y_continuous(limits = c(10, 100))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+dat_num_sta <- tibble(Pre = num_pre, Cond = num_cond, Post = num_post, Align = num_aligned) %>% 
+  add_column(ID = c("m3", "m7", "m17", "m18", "m855", "m857")) %>%
+  pivot_longer(-ID) %>% 
+  mutate(name = factor(name, levels = c("Pre", "Cond", "Post", "Align"))) %>% 
+  ddply(., .(name), summarise,n=length(value),mean=mean(value),sd=sd(value),se=sd(value)/sqrt(length(value)))
+  
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_number.pdf", width = 55/25.6, height = 65/25.6, family = "Arial")
+dat_num
+dev.off()
+
+## corss-day aligned neuron number
+p_number <- tibble(num = c(48, 36, 19, 25, 58, 19), Group = "Num") %>% 
+  ggplot(., aes(x = Group, y = num))+
+  geom_boxplot()+
+  geom_jitter(width = 0.2, shape=1)+
+  labs(x="", y="No. of cross-day aligned cells")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  scale_y_continuous(limits = c(0, 100))+
+  theme(legend.position = "none")
+
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_number_cross.pdf", width = 40/25.6, height = 65/25.6, family = "Arial")
+p_number
+dev.off()
