@@ -169,7 +169,10 @@ p_test <- lapply(dat_acti_combine, function(x) x[[1]]) %>%
 
 summary(p_test)
 
-dat_anti_sta <- 
+dat_anti_sta <- lapply(dat_acti_combine, function(x) x[[1]]) %>% 
+  do.call(rbind,.) %>% 
+  mutate(Group = factor(Group, levels = c("Pre", "Cond", "Post"))) %>% 
+  ddply(., .(Group),summarise,n=length(cell_acti),mean=mean(cell_acti),sd=sd(cell_acti),se=sd(cell_acti)/sqrt(length(cell_acti)))
 
 dat_cell_acti <- lapply(dat_acti_combine, function(x) x[[1]]) %>% 
   do.call(rbind,.) %>% 
@@ -233,6 +236,14 @@ TukeyHSD(t_cell_acti, ordered = T)
 
 pairwise.t.test(t_cell_acti$mean_acti, t_cell_acti$Group, paired = T, alternative = "greater")
 
+cell_acti_sta <- lapply(dat_cell_trace, function(x) x[[3]]) %>% 
+  do.call(cbind,.) %>% 
+  add_column(Group = "Post") %>% 
+  rbind(dat_cell_pre_trace, dat_cell_cond_trace,.) %>%
+  mutate(Group = factor(Group, levels = c("Pre", "Cond", "Post"))) %>% 
+  pivot_longer(-Group) %>% 
+  ddply(., .(name, Group), summarise, mean_acti = mean(value)) %>% 
+  ddply(., .(Group), summarise,n=length(mean_acti),mean=mean(mean_acti),sd=sd(mean_acti),se=sd(mean_acti)/sqrt(length(mean_acti)))
 
 ## compare cells show increased activity
 p_cell_portion <- lapply(dat_acti_combine, function(x) x[[2]]) %>% 
