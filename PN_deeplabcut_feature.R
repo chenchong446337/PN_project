@@ -134,7 +134,7 @@ dat_feature_ctrl_sta <- dat_feature_ctrl_sta %>%
   add_column(Group = "Ctrl", .before = "Day")
 
   
-#write.csv(dat_feature_ctrl_d56,"~cchen/Documents/neuroscience/Pn\ project/Data_analysis/Deeplabcut_behavior/data/dat_feature_ctrl_d56.csv", row.names = FALSE)
+# write.csv(dat_feature_ctrl_sta,"~cchen/Documents/neuroscience/Pn\ project/Data_analysis/Deeplabcut_behavior/data/dat_feature_ctrl_sta.csv", row.names = FALSE)
 
 
 ## for cond d5 and D6
@@ -167,7 +167,6 @@ dat_feature_cond_sta <- dat_feature_cond_sta %>%
   do.call(rbind,.) %>% 
   as_tibble() %>% 
   add_column(Group = "Cond", .before = "Day")
-# write.csv(dat_feature_cond_d56,"~cchen/Documents/neuroscience/Pn\ project/Data_analysis/Deeplabcut_behavior/data/dat_feature_cond_d56.csv", row.names = FALSE)
 
 ## combine data to do clustering
 dat_behavior_com <- full_join(dat_feature_ctrl, dat_feature_cond) 
@@ -193,7 +192,8 @@ dat_feature_tsne <- dat_behavior_com_tsne %>%
 
 
 # saveRDS(dat_feature_tsne, file = "~cchen/Documents/neuroscience/Pn\ project/Data_analysis/Deeplabcut_behavior/data/dat_feature_tsne.rds")
-
+### start from here-----
+dat_feature_tsne <- readRDS("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/Deeplabcut_behavior/data/dat_feature_tsne1.rds")
 
 cluster_optimal <- dat_feature_tsne %>% 
   select(V1, V2) %>% 
@@ -205,7 +205,7 @@ cluster_optimal <- dat_feature_tsne %>%
 name_col <- colnames(dat_feature_tsne)[6:18]
 
 for (i in name_col) {
-  plx <- ggplot(dat_feature_tsne, aes(V1, V2))+
+  plx <- ggplot(dat_feature_tsne, aes(V1, V2, shape = Group))+
     geom_point(aes_string(colour = i))+
     scale_colour_gradientn(colours = terrain.colors(10))+
     theme_bw()
@@ -215,11 +215,12 @@ for (i in name_col) {
   
   
 
-
+cluster_num <- 10
+set.seed(42)
 k_cluster <- dat_feature_tsne %>% 
   select(V1, V2) %>% 
   as.matrix() %>% 
-  kmeans(., centers = 10, nstart = 50, iter.max = 500)
+  kmeans(., centers = cluster_num, nstart = 50, iter.max = 500)
 
 
 k_cluster_centroid <- k_cluster$centers %>% 
@@ -230,7 +231,7 @@ p_tsne_density <- dat_feature_tsne %>%
   mutate(cluster = as.factor(cluster)) %>% 
   ggplot(., aes(x = V1, y = V2, col = cluster))+
   geom_point(alpha = 0.4)+
-  geom_text(data = k_cluster_centroid, mapping = aes(x = V1, y = V2,label = 1:10),
+  geom_text(data = k_cluster_centroid, mapping = aes(x = V1, y = V2,label = 1:cluster_num),
             color = "black", size = 4) 
   
   #stat_ellipse(type = "t", geom = "polygon",alpha = 0.4) %>% 
@@ -238,16 +239,37 @@ p_tsne_density <- dat_feature_tsne %>%
 dat_feature_tsne_sta1 <- dat_feature_tsne %>% 
   add_column(cluster = k_cluster$cluster) %>% 
   mutate(cluster = as.factor(cluster)) %>% 
-  ddply(., .(Group), summarise, n_total = length(cluster)) 
+  mutate(ID = str_extract(Trail, regex("m\\d+"))) %>% 
+  ddply(., .(Group, ID), summarise, n_total = length(cluster)) 
 
 dat_feature_tsne_sta <- dat_feature_tsne %>% 
   add_column(cluster = k_cluster$cluster) %>% 
   mutate(cluster = as.factor(cluster)) %>% 
-  ddply(., .(Group, cluster), summarise, n = length(cluster)) %>% 
-  right_join(., dat_feature_tsne_sta1, by = "Group") %>% 
-  mutate(ratio = n/n_total)
+  mutate(ID = str_extract(Trail, regex("m\\d+"))) %>% 
+  filter(Day =="D7") %>% 
+  ddply(., .(Group, cluster, ID), summarise, n = length(cluster)) %>% 
+  right_join(., dat_feature_tsne_sta1, by = c("Group")) %>% 
+  mutate(ratio = n/n_total) %>% 
+  ddply(., .(Group, cluster), summarise, mean=mean(ratio), sd=sd(ratio),se=sd(ratio)/sqrt(length(ratio))) %>%  
+  ggplot(., aes(x = cluster, y = mean, fill = Group, group = Group))+
+  geom_bar(stat="identity", color="black", position=position_dodge()) +
+  geom_errorbar(aes(ymin=mean, ymax=mean+sd), width=.2,
+                position=position_dodge(.9))+
+  scale_y_continuous(limits = c(0, 0.3))+
+  coord_flip()
 rm(dat_feature_tsne_sta1)
 
+t_feature_tsne_sta <- dat_feature_tsne %>% 
+  add_column(cluster = k_cluster$cluster) %>% 
+  mutate(cluster = as.factor(cluster)) %>% 
+  mutate(ID = str_extract(Trail, regex("m\\d+"))) %>% 
+  #filter(Day =="D7") %>% 
+  ddply(., .(Group, ID,cluster), summarise, n = length(cluster)) %>% 
+  right_join(., dat_feature_tsne_sta1, by = c("Group", "ID")) %>% 
+  mutate(ratio = n/n_total) %>% 
+  aov(ratio ~ Group + cluster,.)
+  
+summary(t_feature_tsne_sta)
 
 p_tsne_density <- dat_feature_tsne %>% 
   add_column(cluster = k_cluster$cluster) %>% 
@@ -255,7 +277,11 @@ p_tsne_density <- dat_feature_tsne %>%
   ggplot(., aes(x = V1, y = V2, col = Group))+
   geom_point(alpha = 0.4)
  
-
+## check the behavior of each cluster
+dat_behavior <- dat_feature_tsne %>% 
+  add_column(cluster = k_cluster$cluster) %>% 
+  select(Group, Day, Trail, cluster) %>% 
+  filter(Day =="D7")
 
 
 

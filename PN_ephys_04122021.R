@@ -956,7 +956,7 @@ p_epsc_prop
 dev.off()
 ## Compare the E-I ratio----
 
-p_EI_ratio <- read.xlsx("~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/ephys/PN_ephys.xlsx", sheet = "E_I") %>% 
+p_EI_ratio <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/ephys/PN_ephys.xlsx", sheet = "E_I") %>% 
   mutate(Group = factor(Group, levels = c("Ctrl", "Cond."))) %>% 
   ggplot(., aes(Group, Ratio, group = Group))+
   geom_boxplot(outlier.shape = NA)+
@@ -990,11 +990,11 @@ p_EI_latency <- read.xlsx("~cchen2/Documents/neuroscience/Pn\ project/Data_analy
         axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
   theme(legend.position = 'none')
 
-dat_EI_latency_sta <- read.xlsx("~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/ephys/PN_ephys.xlsx", sheet = "E_I") %>% 
+dat_EI_latency_sta <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/ephys/PN_ephys.xlsx", sheet = "E_I") %>% 
   mutate(Group = factor(Group, levels = c("Ctrl", "Cond."))) %>% 
   ddply(., .(Group), summarise,n=length(Diff_latency1),mean=mean(Diff_latency1),sd=sd(Diff_latency1),se=sd(Diff_latency1)/sqrt(length(Diff_latency1)))
 
-dat_EI_ratio_sta <- read.xlsx("~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/ephys/PN_ephys.xlsx", sheet = "E_I") %>% 
+dat_EI_ratio_sta <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/ephys/PN_ephys.xlsx", sheet = "E_I") %>% 
   mutate(Group = factor(Group, levels = c("Ctrl", "Cond."))) %>% 
   ddply(., .(Group), summarise,n=length(Ratio),mean=mean(Ratio),sd=sd(Ratio),se=sd(Ratio)/sqrt(length(Ratio)))
 
@@ -1002,7 +1002,7 @@ t_EI_latency <- read.xlsx("~cchen2/Documents/neuroscience/Pn\ project/Data_analy
   mutate(Group = factor(Group, levels = c("Ctrl", "Cond."))) %>% 
   wilcox.test(Diff_latency1~Group, .)
 
-t_EI_ratio <- read.xlsx("~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/ephys/PN_ephys.xlsx", sheet = "E_I") %>% 
+t_EI_ratio <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/ephys/PN_ephys.xlsx", sheet = "E_I") %>% 
   mutate(Group = factor(Group, levels = c("Ctrl", "Cond."))) %>% 
   wilcox.test(Ratio~Group, .)
 

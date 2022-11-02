@@ -2183,3 +2183,715 @@ dat_trace1 <- raveio::read_mat("~cchen/Documents/neuroscience/Pn\ project/Data_a
   theme(legend.position = "none")+
   theme(strip.text.y = element_blank())
 
+
+## plot the noise and signal baseline level with data from Fatih------
+
+p_noise_cor_all <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/all_noise_cor.xlsx", rowNames = F, cols = c(1:4)) %>% 
+  as_tibble() %>% 
+  select(X1, Pre, Cond, Post) %>% 
+  pivot_longer(-X1) %>% 
+  mutate(name = factor(name, levels = c("Pre", "Cond", "Post"))) %>% 
+  ggplot(., aes(name, value, color = name))+
+  geom_violin()+
+  geom_jitter(aes(colour = name, shape = name),width = 0.2,  size=2, alpha= 0.3)+
+  scale_color_manual(values=c("#8491B4FF", "#00A087FF", "#3C5488FF"))+
+  labs(x="", y="Noise correaltion (r)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  scale_y_continuous(limits = c(0, 1))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+
+t_noise_cor_all <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/all_noise_cor.xlsx", rowNames = F, cols = c(1:4)) %>% 
+  as_tibble() %>% 
+  select(X1, Pre, Cond, Post) %>% 
+  pivot_longer(-X1) %>% 
+  aov(value~name,.)
+
+dat_noise_cor_all_sta <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/all_noise_cor.xlsx", rowNames = F, cols = c(1:4)) %>% 
+  as_tibble() %>% 
+  select(X1, Pre, Cond, Post) %>% 
+  pivot_longer(-X1) %>% 
+  ddply(., .(name), summarise, mean = mean(value))
+summary(t_noise_cor_all)
+TukeyHSD(t_noise_cor_all, ordered = T)
+
+
+## averaged by mice
+p_noise_cor_mice <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/all_noise_cor.xlsx", rowNames = F, cols = c(1, 5:7)) %>% 
+  as_tibble(.name_repair = "minimal") %>% 
+  rename(ID = 1, Pre = 2, Cond = 3, Post = 4) %>% 
+  drop_na() %>% 
+  pivot_longer(-ID) %>% 
+  mutate(name = factor(name, levels = c("Pre", "Cond", "Post"))) %>% 
+  ggplot(., aes(name, value, group = name))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_line(aes(group=ID), colour="gray90")+
+  geom_jitter(aes(colour =name, shape =name),width = 0.2,  size=2)+
+  scale_color_manual(values=c("#8491B4FF", "#00A087FF", "#3C5488FF"))+
+  labs(x="", y="Noise correlation (r)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  scale_y_continuous(limits = c(0.02, 0.1))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+
+t_noise_cor_mice <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/all_noise_cor.xlsx", rowNames = F, cols = c(1, 5:7)) %>% 
+  as_tibble(.name_repair = "minimal") %>% 
+  rename(ID = 1, Pre = 2, Cond = 3, Post = 4) %>% 
+  drop_na() %>% 
+  pivot_longer(-ID) %>% 
+  aov(value~name,.)
+
+summary(t_noise_cor_mice)
+TukeyHSD(t_noise_cor_mice, ordered = T)
+
+
+p_noise_all <- plot_grid(p_noise_cor_all, p_noise_cor_mice, nrow = 1)
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_noise_all.pdf", width = 90/25.6, height = 60/25.6, family = "Arial")
+p_noise_all
+dev.off()
+## for signal
+
+p_signal_cor_all <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/all_signal_cor.xlsx", rowNames = F, cols = c(1:4)) %>% 
+  as_tibble() %>% 
+  select(X1, Pre, Cond, Post) %>% 
+  pivot_longer(-X1) %>% 
+  mutate(name = factor(name, levels = c("Pre", "Cond", "Post"))) %>% 
+  ggplot(., aes(name, value, color = name))+
+  geom_violin()+
+  geom_jitter(aes(colour = name, shape = name),width = 0.2,  size=2, alpha= 0.3)+
+  scale_color_manual(values=c("#8491B4FF", "#00A087FF", "#3C5488FF"))+
+  labs(x="", y="Signal correlation (r)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  scale_y_continuous(limits = c(0, 1))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+
+t_signal_cor_all <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/all_signal_cor.xlsx", rowNames = F, cols = c(1:4)) %>% 
+  as_tibble() %>% 
+  select(X1, Pre, Cond, Post) %>% 
+  pivot_longer(-X1) %>% 
+  aov(value~name,.)
+
+summary(t_signal_cor_all)
+TukeyHSD(t_signal_cor_all, ordered = T)
+
+## averaged by mice
+p_signal_cor_mice <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/all_signal_cor.xlsx", rowNames = F, cols = c(1, 5:7)) %>% 
+  as_tibble(.name_repair = "minimal") %>% 
+  rename(ID = 1, Pre = 2, Cond = 3, Post = 4) %>% 
+  drop_na() %>% 
+  pivot_longer(-ID) %>% 
+  mutate(name = factor(name, levels = c("Pre", "Cond", "Post"))) %>% 
+  ggplot(., aes(name, value, group = name))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_line(aes(group=ID), colour="gray90")+
+  geom_jitter(aes(colour =name, shape =name),width = 0.2,  size=2)+
+  scale_color_manual(values=c("#8491B4FF", "#00A087FF", "#3C5488FF"))+
+  labs(x="", y="Signal correlation (r)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  scale_y_continuous(limits = c(0.1, 0.3))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+
+t_signal_cor_mice <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/all_signal_cor.xlsx", rowNames = F, cols = c(1, 5:7)) %>% 
+  as_tibble(.name_repair = "minimal") %>% 
+  rename(ID = 1, Pre = 2, Cond = 3, Post = 4) %>% 
+  drop_na() %>% 
+  pivot_longer(-ID) %>% 
+  aov(value~name,.)
+
+summary(t_signal_cor_mice)
+TukeyHSD(t_signal_cor_mice, ordered = T)
+
+p_signal_all <- plot_grid(p_signal_cor_all, p_signal_cor_mice, nrow = 1)
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_signal_all.pdf", width = 90/25.6, height = 60/25.6, family = "Arial")
+p_signal_all
+dev.off()
+
+
+## For back-crossing noise
+
+p_noise_cor_all_back <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/back_crossing_noise_cor.xlsx", rowNames = F, cols = c(1:3)) %>% 
+  as_tibble() %>% 
+  select(X1, Pre, Post) %>% 
+  pivot_longer(-X1) %>% 
+  mutate(name = factor(name, levels = c("Pre", "Post"))) %>% 
+  ggplot(., aes(name, value, color = name))+
+  geom_violin()+
+  geom_jitter(aes(colour = name, shape = name),width = 0.2,  size=2, alpha = 0.3)+
+  scale_color_manual(values=c("#8491B4FF", "#3C5488FF"))+
+  scale_shape_manual(values=c(16,15))+
+  labs(x="", y="Noise correlation during crossing back (r)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  #scale_y_continuous(limits = c(0, 1))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+
+t_noise_cor_all_back <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/back_crossing_noise_cor.xlsx", rowNames = F, cols = c(1:3)) %>% 
+  as_tibble() %>% 
+  select(X1, Pre, Post) %>% 
+  pivot_longer(-X1) %>% 
+  wilcox.test(value~name,.)
+
+
+
+## averaged by mice
+p_noise_cor_mice_back <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/back_crossing_noise_cor.xlsx", rowNames = F, cols = c(1, 4,5)) %>% 
+  as_tibble(.name_repair = "minimal") %>% 
+  rename(ID = 1, Pre = 2, Post = 3) %>% 
+  drop_na() %>% 
+  pivot_longer(-ID) %>% 
+  mutate(name = factor(name, levels = c("Pre", "Cond", "Post"))) %>% 
+  ggplot(., aes(name, value, group = name))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_line(aes(group=ID), colour="gray90")+
+  geom_jitter(aes(colour =name, shape =name),width = 0.2,  size=2)+
+  scale_color_manual(values=c("#8491B4FF", "#3C5488FF"))+
+  scale_shape_manual(values=c(16,15))+
+  labs(x="", y="Noise correlation during crossing back (r)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  scale_y_continuous(limits = c(0.1, 0.2))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+
+t_noise_cor_mice <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/back_crossing_noise_cor.xlsx", rowNames = F, cols = c(1, 4,5)) %>% 
+  as_tibble(.name_repair = "minimal") %>% 
+  rename(ID = 1, Pre = 2, Post = 3) %>% 
+  drop_na() %>% 
+  pivot_longer(-ID) %>% 
+  wilcox.test(value~name,.)
+
+
+p_signal_all_back <- plot_grid(p_noise_cor_all_back, p_noise_cor_mice_back, nrow = 1)
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_signal_all_back.pdf", width = 90/25.6, height = 60/25.6, family = "Arial")
+p_signal_all_back
+dev.off()
+## for signal
+
+p_signal_cor_all_back <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/back_crossing_signal_cor.xlsx", rowNames = F, cols = c(1:3)) %>% 
+  as_tibble() %>% 
+  select(X1, Pre, Post) %>% 
+  pivot_longer(-X1) %>% 
+  mutate(name = factor(name, levels = c("Pre",  "Post"))) %>% 
+  ggplot(., aes(name, value, color = name))+
+  geom_violin()+
+  geom_jitter(aes(colour = name, shape = name),width = 0.2,  size=2, alpha= 0.3)+
+  scale_color_manual(values=c("#8491B4FF", "#3C5488FF"))+
+  scale_shape_manual(values=c(16,15))+
+  labs(x="", y="Signal correlation during crossing back (r)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  # scale_y_continuous(limits = c(-1, 6))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+
+t_signal_cor_all_back <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/back_crossing_signal_cor.xlsx", rowNames = F, cols = c(1:3)) %>% 
+  as_tibble() %>% 
+  select(X1, Pre, Post) %>% 
+  pivot_longer(-X1) %>% 
+  wilcox.test(value~name,.)
+
+
+
+## averaged by mice
+p_signal_cor_mice_back <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/back_crossing_signal_cor.xlsx", rowNames = F, cols = c(1, 4, 5)) %>% 
+  as_tibble(.name_repair = "minimal") %>% 
+  rename(ID = 1, Pre = 2, Post = 3) %>% 
+  drop_na() %>% 
+  pivot_longer(-ID) %>% 
+  mutate(name = factor(name, levels = c("Pre", "Post"))) %>% 
+  ggplot(., aes(name, value, group = name))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_line(aes(group=ID), colour="gray90")+
+  geom_jitter(aes(colour =name, shape =name),width = 0.2,  size=2)+
+  scale_color_manual(values=c("#8491B4FF", "#3C5488FF"))+
+  scale_shape_manual(values=c(16,15))+
+  labs(x="", y="Signal correlation (r)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  scale_y_continuous(limits = c(0.05, 0.35))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+
+t_signal_cor_mice_back <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/back_crossing_signal_cor.xlsx", rowNames = F, cols = c(1, 4, 5)) %>% 
+  as_tibble(.name_repair = "minimal") %>% 
+  rename(ID = 1, Pre = 2, Post = 3) %>% 
+  drop_na() %>% 
+  pivot_longer(-ID) %>% 
+  wilcox.test(value~name,.)
+
+p_signal_mice_back <- plot_grid(p_signal_cor_all_back, p_signal_cor_mice_back, nrow = 1)
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_signal_mice_back.pdf", width = 90/25.6, height = 60/25.6, family = "Arial")
+p_signal_mice_back
+dev.off()
+## for first crossing
+
+
+p_noise_cor_all_d7 <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/first_crossing_noise_cor.xlsx", rowNames = F, cols = c(1:4)) %>% 
+  as_tibble() %>% 
+  select(X1, Pre, Cond, Post) %>% 
+  pivot_longer(-X1) %>% 
+  mutate(name = factor(name, levels = c("Pre", "Cond", "Post"))) %>% 
+  ggplot(., aes(name, value, color = name))+
+  geom_violin()+
+  geom_jitter(aes(colour = name, shape = name),width = 0.2,  size=2, alpha= 0.3)+
+  scale_color_manual(values=c("#8491B4FF", "#00A087FF", "#3C5488FF"))+
+  labs(x="", y="Noise correaltion druing first crossing (r)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  # scale_y_continuous(limits = c(-1, 6))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+
+t_noise_cor_all_d7 <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/first_crossing_noise_cor.xlsx", rowNames = F, cols = c(1:4)) %>% 
+  as_tibble() %>% 
+  select(X1, Pre, Cond, Post) %>% 
+  pivot_longer(-X1) %>% 
+  aov(value~name,.)
+
+summary(t_noise_cor_all_d7)
+TukeyHSD(t_noise_cor_all_d7, ordered = T)
+
+## averaged by mice
+p_noise_cor_mice_d7 <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/first_crossing_noise_cor.xlsx", rowNames = F, cols = c(1, 5:7)) %>% 
+  as_tibble(.name_repair = "minimal") %>% 
+  rename(ID = 1, Pre = 2, Cond = 3, Post = 4) %>% 
+  drop_na() %>% 
+  pivot_longer(-ID) %>% 
+  mutate(name = factor(name, levels = c("Pre", "Cond", "Post"))) %>% 
+  ggplot(., aes(name, value, group = name))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_line(aes(group=ID), colour="gray90")+
+  geom_jitter(aes(colour =name, shape =name),width = 0.2,  size=2)+
+  scale_color_manual(values=c("#8491B4FF", "#00A087FF", "#3C5488FF"))+
+  labs(x="", y="Noise correlation during first crossing (r)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  scale_y_continuous(limits = c(0.02, 0.3))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+
+t_noise_cor_mice_d7 <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/first_crossing_noise_cor.xlsx", rowNames = F, cols = c(1, 5:7)) %>% 
+  as_tibble(.name_repair = "minimal") %>% 
+  rename(ID = 1, Pre = 2, Cond = 3, Post = 4) %>% 
+  drop_na() %>% 
+  pivot_longer(-ID) %>% 
+  aov(value~name,.)
+
+summary(t_noise_cor_mice_d7)
+TukeyHSD(t_noise_cor_mice_d7, ordered = T)
+
+p_noise_crossing_d7 <- plot_grid(p_noise_cor_all_d7, p_noise_cor_mice_d7, nrow = 1)
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_noise_crossing_d7.pdf", width = 90/25.6, height = 60/25.6, family = "Arial")
+p_noise_crossing_d7
+dev.off()
+
+## for signal
+
+p_signal_cor_all_d7 <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/first_crossing_signal_cor.xlsx", rowNames = F, cols = c(1:4)) %>% 
+  as_tibble() %>% 
+  select(X1, Pre, Cond, Post) %>% 
+  pivot_longer(-X1) %>% 
+  mutate(name = factor(name, levels = c("Pre", "Cond", "Post"))) %>% 
+  ggplot(., aes(name, value, color = name))+
+  geom_violin()+
+  geom_jitter(aes(colour = name, shape = name),width = 0.2,  size=2, alpha= 0.3)+
+  scale_color_manual(values=c("#8491B4FF", "#00A087FF", "#3C5488FF"))+
+  labs(x="", y="Signal correlation during first crossing (r)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  # scale_y_continuous(limits = c(-1, 6))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+
+t_signal_cor_all_d7 <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/first_crossing_signal_cor.xlsx", rowNames = F, cols = c(1:4)) %>% 
+  as_tibble() %>% 
+  select(X1, Pre, Cond, Post) %>% 
+  pivot_longer(-X1) %>% 
+  aov(value~name,.)
+
+summary(t_signal_cor_all_d7)
+TukeyHSD(t_signal_cor_all_d7, ordered = T)
+
+## averaged by mice
+p_signal_cor_mice_d7 <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/first_crossing_signal_cor.xlsx", rowNames = F, cols = c(1, 5:7)) %>% 
+  as_tibble(.name_repair = "minimal") %>% 
+  rename(ID = 1, Pre = 2, Cond = 3, Post = 4) %>% 
+  drop_na() %>% 
+  pivot_longer(-ID) %>% 
+  mutate(name = factor(name, levels = c("Pre", "Cond", "Post"))) %>% 
+  ggplot(., aes(name, value, group = name))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_line(aes(group=ID), colour="gray90")+
+  geom_jitter(aes(colour =name, shape =name),width = 0.2,  size=2)+
+  scale_color_manual(values=c("#8491B4FF", "#00A087FF", "#3C5488FF"))+
+  labs(x="", y="Signal correlation during first crossing (r)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  scale_y_continuous(limits = c(0.08, 0.32))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+
+t_signal_cor_mice_d7 <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/first_crossing_signal_cor.xlsx", rowNames = F, cols = c(1, 5:7)) %>% 
+  as_tibble(.name_repair = "minimal") %>% 
+  rename(ID = 1, Pre = 2, Cond = 3, Post = 4) %>% 
+  drop_na() %>% 
+  pivot_longer(-ID) %>% 
+  aov(value~name,.)
+
+summary(t_signal_cor_mice_d7)
+TukeyHSD(t_signal_cor_mice_d7, ordered = T)
+
+p_signal_crossing_d7 <- plot_grid(p_signal_cor_all_d7, p_signal_cor_mice_d7, nrow = 1)
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_signal_crossing_d7.pdf", width = 90/25.6, height = 60/25.6, family = "Arial")
+p_signal_crossing_d7
+dev.off()
+
+## for random crossing
+
+p_noise_cor_all_random <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/random_noise_cor.xlsx", rowNames = F, cols = c(1:4)) %>% 
+  as_tibble() %>% 
+  select(X1, Pre, Cond, Post) %>% 
+  pivot_longer(-X1) %>% 
+  mutate(name = factor(name, levels = c("Pre", "Cond", "Post"))) %>% 
+  ggplot(., aes(name, value, color = name))+
+  geom_violin()+
+  geom_jitter(aes(colour = name, shape = name),width = 0.2,  size=2, alpha= 0.3)+
+  scale_color_manual(values=c("#8491B4FF", "#00A087FF", "#3C5488FF"))+
+  labs(x="", y="Noise correaltion \n with random crossing (r)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  # scale_y_continuous(limits = c(-1, 6))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+
+t_noise_cor_all_random <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/random_noise_cor.xlsx", rowNames = F, cols = c(1:4)) %>% 
+  as_tibble() %>% 
+  select(X1, Pre, Cond, Post) %>% 
+  pivot_longer(-X1) %>% 
+  aov(value~name,.)
+
+summary(t_noise_cor_all_random)
+TukeyHSD(t_noise_cor_all_random, ordered = T)
+
+## averaged by mice
+p_noise_cor_mice_random <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/random_noise_cor.xlsx", rowNames = F, cols = c(1, 5:7)) %>% 
+  as_tibble(.name_repair = "minimal") %>% 
+  rename(ID = 1, Pre = 2, Cond = 3, Post = 4) %>% 
+  drop_na() %>% 
+  pivot_longer(-ID) %>% 
+  mutate(name = factor(name, levels = c("Pre", "Cond", "Post"))) %>% 
+  ggplot(., aes(name, value, group = name))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_line(aes(group=ID), colour="gray90")+
+  geom_jitter(aes(colour =name, shape =name),width = 0.2,  size=2)+
+  scale_color_manual(values=c("#8491B4FF", "#00A087FF", "#3C5488FF"))+
+  labs(x="", y="Noise correlation \n with random crossing (r)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  scale_y_continuous(limits = c(0.1, 0.2))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+
+t_noise_cor_mice_random <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/random_noise_cor.xlsx", rowNames = F, cols = c(1, 5:7)) %>% 
+  as_tibble(.name_repair = "minimal") %>% 
+  rename(ID = 1, Pre = 2, Cond = 3, Post = 4) %>% 
+  drop_na() %>% 
+  pivot_longer(-ID) %>% 
+  aov(value~name,.)
+
+dat_noise_cor_mice_random_sta <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/random_noise_cor.xlsx", rowNames = F, cols = c(1, 5:7)) %>% 
+  as_tibble(.name_repair = "minimal") %>% 
+  rename(ID = 1, Pre = 2, Cond = 3, Post = 4) %>% 
+  drop_na() %>% 
+  pivot_longer(-ID) %>% 
+  ddply(., .(name), summarise, mean = mean(value))
+
+
+summary(t_noise_cor_mice_random)
+TukeyHSD(t_noise_cor_mice_random, ordered = T)
+
+
+p_noise_cor_random <- plot_grid(p_noise_cor_all_random, p_noise_cor_mice_random, nrow = 1)
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+tiff("p_noise_cor_random.tiff", width= 90/25.6, height= 60/25.6, units="in", res=300)
+p_noise_cor_random
+dev.off()
+## for signal
+
+p_signal_cor_all_random <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/random_signal_cor.xlsx", rowNames = F, cols = c(1:4)) %>% 
+  as_tibble() %>% 
+  select(X1, Pre, Cond, Post) %>% 
+  pivot_longer(-X1) %>% 
+  mutate(name = factor(name, levels = c("Pre", "Cond", "Post"))) %>% 
+  ggplot(., aes(name, value, color = name))+
+  geom_violin()+
+  geom_jitter(aes(colour = name, shape = name),width = 0.2,  size=2, alpha= 0.3)+
+  scale_color_manual(values=c("#8491B4FF", "#00A087FF", "#3C5488FF"))+
+  labs(x="", y="Signal correlation with \n random crossing (r)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  # scale_y_continuous(limits = c(-1, 6))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+
+t_signal_cor_all_random <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/random_signal_cor.xlsx", rowNames = F, cols = c(1:4)) %>% 
+  as_tibble() %>% 
+  select(X1, Pre, Cond, Post) %>% 
+  pivot_longer(-X1) %>% 
+  aov(value~name,.)
+
+summary(t_signal_cor_all_random)
+TukeyHSD(t_signal_cor_all_random)
+
+## averaged by mice
+p_signal_cor_mice_random <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/random_signal_cor.xlsx", rowNames = F, cols = c(1, 5:7)) %>% 
+  as_tibble(.name_repair = "minimal") %>% 
+  rename(ID = 1, Pre = 2, Cond = 3, Post = 4) %>% 
+  drop_na() %>% 
+  pivot_longer(-ID) %>% 
+  mutate(name = factor(name, levels = c("Pre", "Cond", "Post"))) %>% 
+  ggplot(., aes(name, value, group = name))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_line(aes(group=ID), colour="gray90")+
+  geom_jitter(aes(colour =name, shape =name),width = 0.2,  size=2)+
+  scale_color_manual(values=c("#8491B4FF", "#00A087FF", "#3C5488FF"))+
+  labs(x="", y="Signal correlation with \n random crossing (r)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  scale_y_continuous(limits = c(0.1, 0.3))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+
+t_signal_cor_mice_random <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/random_signal_cor.xlsx", rowNames = F, cols = c(1, 5:7)) %>% 
+  as_tibble(.name_repair = "minimal") %>% 
+  rename(ID = 1, Pre = 2, Cond = 3, Post = 4) %>% 
+  drop_na() %>% 
+  pivot_longer(-ID) %>% 
+  aov(value~name,.)
+
+summary(t_signal_cor_mice_random)
+TukeyHSD(t_signal_cor_mice_random)
+
+p_signal_cor_random <- plot_grid(p_signal_cor_all_random, p_signal_cor_mice_random, nrow = 1)
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+
+tiff("p_signal_cor_random.tiff", width= 90/25.6, height= 60/25.6, units="in", res=300)
+p_signal_cor_random
+
+dev.off()
+
+
+# cairo_pdf("p_signal_cor_random.pdf", width = 90/25.6, height = 60/25.6, family = "Arial")
+# p_signal_cor_random
+# dev.off()
+
+
+## combine first crossing, back crossing and random
+p_noise_cor_mice_back <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/back_crossing_noise_cor.xlsx", rowNames = F, cols = c(1, 4,5)) %>% 
+  as_tibble(.name_repair = "minimal") %>% 
+  rename(ID = 1, Pre = 2, Post = 3) %>% 
+  drop_na() %>% 
+  pivot_longer(-ID) %>% 
+  add_column(Group = "Back_crossing")
+
+p_noise_cor_mice_d7 <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/first_crossing_noise_cor.xlsx", rowNames = F, cols = c(1, 5:7)) %>% 
+  as_tibble(.name_repair = "minimal") %>% 
+  rename(ID = 1, Pre = 2, Cond = 3, Post = 4) %>% 
+  select(-Cond) %>% 
+  drop_na() %>% 
+  pivot_longer(-ID) %>% 
+  add_column(Group = "First_crossing")
+
+
+p_noise_cor_mice_random <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Singal_random/random_noise_cor.xlsx", rowNames = F, cols = c(1, 5:7)) %>% 
+  as_tibble(.name_repair = "minimal") %>% 
+  rename(ID = 1, Pre = 2, Cond = 3, Post = 4) %>% 
+  select(-Cond) %>% 
+  drop_na() %>% 
+  pivot_longer(-ID) %>% 
+  add_column(Group = "Random_crossing")
+
+dat_noise_com <- rbind(p_noise_cor_mice_d7, p_noise_cor_mice_back, p_noise_cor_mice_random) %>% 
+  as_tibble() %>% 
+  mutate(name = factor(name, levels = c("Pre", "Post"))) %>% 
+  mutate(Group = factor(Group, levels = c("First_crossing", "Back_crossing", "Random_crossing"))) %>% 
+  ggplot(., aes(x=Group, y=value, fill=name)) + 
+  geom_boxplot(outlier.shape = NA)+
+  geom_point(position=position_jitterdodge(),alpha=0.3)+
+  scale_color_manual(values=c("#8491B4FF", "#3C5488FF"))+
+  labs(x="", y="Noise correlation (r)")+
+  theme(axis.line.x = element_line(),
+        axis.text.x = element_text(angle = 30, vjust = 0.5, hjust=0.5),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  scale_y_continuous(limits = c(0.05, 0.25))+
+  theme(legend.title = element_blank())
+
+t_dat_noise_com <- rbind(p_noise_cor_mice_d7, p_noise_cor_mice_back, p_noise_cor_mice_random) %>% 
+  as_tibble() %>% 
+  mutate(name = factor(name, levels = c("Pre", "Post"))) %>% 
+  mutate(Group = factor(Group, levels = c("First_crossing", "Back_crossing", "Random_crossing"))) %>% 
+  aov(value ~Group *name, .)
+
+summary(t_dat_noise_com)  
+TukeyHSD(t_dat_noise_com)
+
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("dat_noise_com.pdf", width = 92/25.6, height = 70/25.6, family = "Arial")
+dat_noise_com
+dev.off()
+
+## compare two 
+dat_noise_com <- rbind(p_noise_cor_mice_d7, p_noise_cor_mice_back, p_noise_cor_mice_random) %>% 
+  as_tibble() %>% 
+  mutate(name = factor(name, levels = c("Pre", "Post"))) %>% 
+  mutate(Group = factor(Group, levels = c("First_crossing", "Back_crossing", "Random_crossing"))) %>% 
+  filter(name == "Pre") %>% 
+  ggplot(., aes(x=Group, y=value, fill=Group)) + 
+  geom_boxplot(outlier.shape = NA)+
+  geom_point(position=position_jitterdodge(),alpha=0.3)+
+  labs(x="", y="Noise correlation (r)", title = "Pre")+
+  theme(axis.line.x = element_line(),
+        axis.text.x = element_text(angle = 30, vjust = 0.5, hjust=0.5),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  scale_y_continuous(limits = c(0.05, 0.25))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+
+dat_noise_com_post <- rbind(p_noise_cor_mice_d7, p_noise_cor_mice_back, p_noise_cor_mice_random) %>% 
+  as_tibble() %>% 
+  mutate(name = factor(name, levels = c("Pre", "Post"))) %>% 
+  mutate(Group = factor(Group, levels = c("First_crossing", "Back_crossing", "Random_crossing"))) %>% 
+  filter(name == "Post") %>% 
+  ggplot(., aes(x=Group, y=value, fill=Group)) + 
+  geom_boxplot(outlier.shape = NA)+
+  geom_point(position=position_jitterdodge(),alpha=0.3)+
+  labs(x="", y="Noise correlation (r)", title = "Post")+
+  theme(axis.line.x = element_line(),
+        axis.text.x = element_text(angle = 30, vjust = 0.5, hjust=0.5),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  scale_y_continuous(limits = c(0.05, 0.25))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+p_combine <- plot_grid(dat_noise_com, dat_noise_com_post, nrow = 1)
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("dat_noise_com.pdf", width = 120/25.6, height = 70/25.6, family = "Arial")
+p_combine
+dev.off()
+
+t_aov <- rbind(p_noise_cor_mice_d7, p_noise_cor_mice_back, p_noise_cor_mice_random) %>% 
+  as_tibble() %>% 
+  mutate(name = factor(name, levels = c("Pre", "Post"))) %>% 
+  mutate(Group = factor(Group, levels = c("First_crossing", "Back_crossing", "Random_crossing"))) %>% 
+  filter(name == "Post") %>% 
+  aov(value ~ Group, .)
+
+summary(t_aov)
+TukeyHSD(t_aov)
