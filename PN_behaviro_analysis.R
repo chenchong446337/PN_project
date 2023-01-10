@@ -2316,7 +2316,7 @@ cairo_pdf("p_von_inhibit.pdf", width = 90/25.6, height = 60/25.6, family = "Aria
 p_von_inhibit
 dev.off()
 
-p_hot_inhibit1 <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/Pn_anti_10072020.xlsx", sheet = 4) %>% 
+p_hot_inhibit1 <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Pn_anti_10072020.xlsx", sheet = 4) %>% 
   filter(Temp == 48) %>% 
   select("Group", "ID", "Latency_withdraw") %>%
   mutate(Group = factor(Group, levels = c('eYFP', 'NpHR', "ChR2"))) %>% 
@@ -2613,7 +2613,7 @@ dev.off()
 dat_penk_manual <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/anti_opto_behavior/08252020/wt_optic_08252020_manualy.xlsx", sheet = 2) %>% 
   mutate('Rearing'= (First_rearing - Frame_1st_crossing)/10, 'Licking'= (First_licking -Frame_1st_crossing)/10 , 'Jumping'= (Jump -Frame_1st_crossing)/10) %>% 
   pivot_longer(-c(Group, ID), names_to = "variable", values_to = 'value') %>% 
-  mutate(Group=factor(Group, levels=c("eYFP", "NpHR", "ChR2")))
+  mutate(Group=factor(Group, levels=c("EYFP", "Nphr", "Chr2")))
 
 dat_penk_manual_sta <- dat_penk_manual %>% 
   ddply(., .( variable, Group), summarise,n=length(value),mean=mean(value),sd=sd(value),se=sd(value)/sqrt(length(value)))

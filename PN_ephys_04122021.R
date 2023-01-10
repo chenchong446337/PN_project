@@ -2,9 +2,14 @@
 library(readABF)
 ## for the ephys data
 ##for the intrincit properties------
-dat_ap_current <- read.xlsx("~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/ephys/PN_ephys.xlsx", sheet = 1) %>% 
+dat_ap_current <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/ephys/PN_ephys.xlsx", sheet = 1) %>% 
   mutate(Group = factor(Group, levels = c("Ctrl", "Cond")))
 
+dat_ap_current_sta <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/ephys/PN_ephys.xlsx", sheet = 1) %>% 
+  mutate(Group = factor(Group, levels = c("Ctrl", "Cond"))) %>% 
+  pivot_longer(-c(Group, ID)) %>% 
+  ddply(.,.(Group, name), summarise,n=length(value),mean=mean(value),sd=sd(value),se=sd(value)/sqrt(length(value)))
+  
 # for RMP
 p_rmp <- dat_ap_current %>% 
   select(Group, RMP) %>% 
@@ -1624,7 +1629,7 @@ dev.off()
 
 
 ## behavior for PAC ephys-----
-p_ratio <- read.xlsx("~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/ephys/PN_ephys.xlsx", sheet = "PAC_ephys_behavior") %>% 
+p_ratio <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/ephys/PN_ephys.xlsx", sheet = "PAC_ephys_behavior") %>% 
   filter(variable=="Ratio" ) %>% 
   ggplot(., aes(Day, mean, group=Group, colour = Group))+
   geom_line()+
@@ -1643,7 +1648,7 @@ p_ratio <- read.xlsx("~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/e
   scale_y_continuous(limits = c(20, 100))+
   theme(legend.position = "none")
 
-t_ratio_ephy <- read.xlsx("~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/ephys/PN_ephys.xlsx", sheet = "PAC_ephys_behavior") %>% 
+t_ratio_ephy <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/ephys/PN_ephys.xlsx", sheet = "PAC_ephys_behavior") %>% 
   filter(variable=="Ratio" )
 setwd("~cchen2/Documents/neuroscience/Pn\ project/Figure/PDF/")
 cairo_pdf("p_pac_ephys.pdf", width = 80/25.6, height = 60/25.6, family = "Arial")
