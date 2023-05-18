@@ -450,7 +450,7 @@ dev.off()
 
 
 ## plot the current injection trace-----
-trace_acc_cond <- readABF("~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/ephys/Current\ injection/21406007.abf")[['data']] %>% 
+trace_acc_cond <- readABF("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/ephys/Current\ injection/21406007.abf")[['data']] %>% 
   map(., function(x) x[,1]) %>% 
   do.call(cbind,. ) %>% 
   as_tibble() %>% 
@@ -1860,3 +1860,129 @@ setwd("~cchen2/Documents/neuroscience/Pn\ project/Figure/PDF/")
 cairo_pdf("p_spon_amp_sta.pdf", width = 40/25.6, height = 60/25.6, family = "Arial")
 p_spon_amp_sta
 dev.off()
+
+## plot trace to show opto inhibtiion of Pn neurons----
+
+trace_pn_opto_before <- readABF("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/ephys/Pn_opto_inhibition/23518011.abf")[['data']] %>% 
+  map(., function(x) x[,1]) %>% 
+  do.call(cbind,. ) %>% 
+  as_tibble() %>% 
+  mutate(Time = seq(0, 15000, length.out = 15000)) %>% 
+  ggplot(., aes(Time, V3))+
+  geom_line(color = "black")+
+  theme_void()+
+  scale_y_continuous(limits = c(-80, 40))+
+  annotate(x=c(13000,13000,15000,15000), y=c(-50),"path")+ # 200ms
+  annotate(x=c(15000), y=c(-50, -50, -30, -30),"path") # 20 mv
+
+
+trace_pn_opto_light <- readABF("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/ephys/Pn_opto_inhibition/23518012.abf")[['data']] %>% 
+  map(., function(x) x[,1]) %>% 
+  do.call(cbind,. ) %>% 
+  as_tibble() %>% 
+  mutate(Time = seq(0, 15000, length.out = 15000)) %>% 
+  ggplot(., aes(Time, V3))+
+  geom_line(color = "black")+
+  theme_void()+
+  scale_y_continuous(limits = c(-100, 40))+
+  annotate(x=c(13000,13000,15000,15000), y=c(-50),"path")+ # 200ms
+  annotate(x=c(15000), y=c(-50, -50, -30, -30),"path") # 20 mv
+
+trace_pn_opto_after <- readABF("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/ephys/Pn_opto_inhibition/23518013.abf")[['data']] %>% 
+  map(., function(x) x[,1]) %>% 
+  do.call(cbind,. ) %>% 
+  as_tibble() %>% 
+  mutate(Time = seq(0, 15000, length.out = 15000)) %>% 
+  ggplot(., aes(Time, V3))+
+  geom_line(color = "black")+
+  theme_void()+
+  scale_y_continuous(limits = c(-80, 40))+
+  annotate(x=c(13000,13000,15000,15000), y=c(-50),"path")+ # 200ms
+  annotate(x=c(15000), y=c(-50, -50, -30, -30),"path") # 20 mv
+
+p_opto_trace <- plot_grid(trace_pn_opto_before, trace_pn_opto_light, trace_pn_opto_after, nrow = 1)
+
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_opto_trace", width = 90/25.6, height = 60/25.6, family = "Arial")
+p_opto_trace
+dev.off()
+
+
+## Plot light-induced voltage change-----
+
+trace_opto_vol <- readABF("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/ephys/Pn_opto_inhibition/23518010.abf")[['data']] %>% 
+  map(., function(x) x[,1]) %>% 
+  do.call(cbind,. ) %>% 
+  as_tibble() %>%
+  slice(1000:4000) %>% 
+  mutate(Time = seq(0, 300, length.out = 3001)) %>% 
+  pivot_longer(-Time)
+
+trace_opto_vol_mean <- trace_opto_vol %>% 
+  ddply(., .(Time), summarise, mean= mean(value))
+
+p_trace_vol <-
+  ggplot()+
+  geom_line(data = trace_opto_vol, aes(x = Time, y = value, group = name),color = "gray90")+
+  geom_line(data= trace_opto_vol_mean, aes(x = Time, y = mean), color = "red")+
+  theme_void()+
+  scale_y_continuous(limits = c(-100, 300))+
+  annotate(x=c(300,300,250,250), y=c(-50),"path")+ # 200ms
+  annotate(x=c(300), y=c(-50, -50, 0, 0),"path") # 20 pA
+
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_opto_trace", width = 90/25.6, height = 60/25.6, family = "Arial")
+p_opto_trace
+dev.off()
+
+## plot the current induced by light
+
+p_light <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/ephys/Pn_opto_inhibition/Pn_ephys.xlsx", sheet = 1) %>% 
+  ggplot(., aes(1, Value)) + 
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width = 0.25, shape = 1)+
+  labs(x="", y="Light-induced current (pA)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))
+
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_light.pdf", width = 30/25.6, height = 60/25.6, family = "Arial")
+p_light
+dev.off()
+
+## plot the Ap freq change 
+p_light_ap <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/ephys/Pn_opto_inhibition/Pn_ephys.xlsx", sheet = 2) %>% 
+  mutate(Treat= factor(Treat, levels= c("Before", "Light", "After"))) %>% 
+  ggplot(., aes(Treat, Firing, group = Treat)) + 
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(aes(colour = Treat),width = 0.2,  size=2)+
+  geom_line(aes(group = ID), colour="gray90")+
+  labs(x="", y="AP frequency (Hz)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_light_ap.pdf", width = 60/25.6, height = 60/25.6, family = "Arial")
+p_light_ap
+dev.off()
+
+
+## statistical test
+
+t_light_ap <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/ephys/Pn_opto_inhibition/Pn_ephys.xlsx", sheet = 2) %>% 
+  mutate(Treat= factor(Treat, levels= c("Before", "Light", "After"))) %>% 
+  aov(Firing~Treat,.)
+summary(t_light_ap)
+TukeyHSD(t_light_ap)
+
