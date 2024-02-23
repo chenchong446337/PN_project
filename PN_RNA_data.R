@@ -77,7 +77,7 @@ DoHeatmap(pbmc, features = top10$gene) + NoLegend()
 ## upset plot of the gene data------
 library("UpSetR")
 
-countsData<-read.csv("~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/gene_data/PG_normalized.csv", 
+countsData<-read.csv("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/gene_data/PG_normalized.csv", 
                      header = T, row.names=1)
 gene_interest <- c("Oprd1", "Oprm1", "Penk", "Slc17a6", "Slc17a7")
 # "Gad2"
@@ -97,10 +97,10 @@ names(list_input) <- gene_interest
 upset(fromList(list_input), order.by = "freq")
 
 ## analyze gene data from Adam-----
-pbmc.data <- read.table("~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/gene_data/From\ Adam/cells.count", header = T, sep = "", dec = ".")
-pbmc.data <- read.delim("~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/gene_data/From\ Adam/cells.count",row.names=1 )
+pbmc.data <- read.table("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/gene_data/From\ Adam/cells.count", header = T, sep = "", dec = ".")
+pbmc.data <- read.delim("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/gene_data/From\ Adam/cells.count",row.names=1 )
 
-gene_name_data <- read.delim("~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/gene_data/From\ Adam/ensembl2entrezID_v90_mm10.txt", )
+gene_name_data <- read.delim("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/gene_data/From\ Adam/ensembl2entrezID_v90_mm10.txt", )
 
 
 
@@ -145,3 +145,11 @@ for (i in seq_along(gene_interest)) {
 
 names(list_input) <- gene_interest
 upset(fromList(list_input), order.by = "freq")
+
+
+## The ratio of Oprd1 and Oprm1 positive neurons----
+#based on data from the upset plot in the supp figure
+num_oprd1 <- 2492
+num_oprm1 <- 429  # this is the oprm only neurons, not neurons co express dor and mor
+ratio <- (num_oprm1+num_oprd1)/4932
+

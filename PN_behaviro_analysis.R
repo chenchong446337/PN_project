@@ -766,7 +766,7 @@ for(i in c(1:7)){
 
 dat_anti_wt <- do.call(rbind, dat_anti_ctrl) %>% 
   rbind(., do.call(rbind, dat_anti_con)) %>% 
-  filter(Day!="Rm") %>% 
+  dplyr::filter(Day!="Rm") %>% 
   pivot_longer(-c(Day, Group, ID), names_to = "variable", values_to = "value" , values_drop_na = TRUE) %>% 
   ddply(., .(ID, variable, Day, Group), summarise, 'value'= mean(value)) %>% 
   mutate(Day=factor(Day, levels = c("Pre",  "Test")), Group=factor(Group, levels = c("Ctrl", "Cond.")))
@@ -2271,6 +2271,7 @@ p_von_inhibit <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analy
         panel.border = element_blank(),
         panel.background = element_blank(),
         axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  scale_y_continuous(limits = c(0, 6))+
   theme(legend.title = element_blank(), legend.position = "none")
 
 dat_von_sta <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Pn_anti_10072020.xlsx", sheet = 1) %>% 
@@ -2289,8 +2290,9 @@ t_von <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/mini
   #mutate(Group = factor(Group, levels = c('eYFP', 'NpHR', 'ChR2'))) %>% 
   aov(Threshold~Group*Light,.)
 summary(t_von)
+TukeyHSD(t_von, ordered = T)  
 
-p_har_inhibit <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/Pn_anti_10072020.xlsx", sheet = 2) %>% 
+p_har_inhibit <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Pn_anti_10072020.xlsx", sheet = "Har_optic_inhibition") %>% 
   select("Group", "ID","Light", "Latency") %>%
   group_by(Group, ID) %>% 
   summarize(d=Latency[Light == "on"]-Latency[Light == "off"]) %>% 
@@ -2411,6 +2413,46 @@ p_von_mutiple <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analy
   scale_y_continuous(limits = c(-0.8, 1))+
   geom_hline(yintercept = 0, linetype=2)+
   theme(legend.title = element_blank(), legend.position = c(0.9, 0.8))
+
+
+p_von_mutiple1 <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Pn_anti_10072020.xlsx", sheet = "von_frey") %>% 
+  mutate(Group = factor(Group, levels = c('eYFP', 'NpHR', "ChR2"))) %>% 
+  ddply(., .(Group, Num_von), summarise,n = length(Withdraw_on),mean=mean(Withdraw_on),sd=sd(Withdraw_on),se=sd(Withdraw_on)/sqrt(length(Withdraw_on))) %>% 
+  ggplot(., aes(Num_von, mean, color=Group))+
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.1) +
+  geom_point(aes(colour = Group, shape = Group),size=2)+
+  geom_line()+
+  scale_shape_manual(values=c(19, 17, 15))+
+  scale_colour_manual(values=c("springgreen4", "orange2", "dodgerblue4"))+
+  labs(x="", y="Withdraw latency (s)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  scale_x_continuous(trans='log10')+
+  scale_y_continuous(limits = c(0, 1.2))+
+  geom_hline(yintercept = 0, linetype=2)+
+  theme(legend.title = element_blank(), legend.position = c(0.2, 0.8))
+
+library(tidyverse)
+library(ggpubr)
+library(rstatix)
+
+t_von_mutiple <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Pn_anti_10072020.xlsx", sheet = "von_frey") %>% 
+  mutate(Num_von = as.factor(Num_von)) %>% 
+  aov(Change ~ Group + Num_von + Group:Num_von, .)
+summary(t_von_mutiple )
+
+
+TukeyHSD(t_von_mutiple)
+
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_von_multiple1.pdf", width = 90/25.6, height = 60/25.6, family = "Arial")
+p_von_mutiple1
+dev.off()
 
 t_von_mutiple <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Pn_anti_10072020.xlsx", sheet = "von_frey") %>% 
   mutate(Num_von = as.factor(Num_von)) %>% 

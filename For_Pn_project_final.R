@@ -108,20 +108,22 @@ cc_anti_behavior <- function(path_ID, frame_rate, length_pix) {
 dat_anti_ctrl <- vector(mode = "list", 7)
 dat_anti_con <- vector(mode = "list", 7)
 length_pix <- c(363,362,363,364,362,364,365)
-day_group <- c("Rm","Rm", "Pre", "Rm","Rm","Rm", "Post")
+day_group <- c("Rm","Rm", "Pre", "D4","D5","D6", "Post")
 for(i in c(1:7)){
-  path_ctrl <- str_c("~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/wt_ctrl_07042020/wt_ctrl/T",i)
-  path_con <-  str_c("~cchen2/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/wt_ctrl_07042020/wt_con/T",i)
+  path_ctrl <- str_c("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/wt_ctrl_07042020/wt_ctrl/T",i)
+  path_con <-  str_c("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/wt_ctrl_07042020/wt_con/T",i)
   dat_anti_ctrl[[i]]<- list.files(path_ctrl,pattern = ".csv", full.names = T ) %>% 
     as.list() %>% 
     mapply(cc_anti_behavior, ., frame_rate = 10, length_pix=length_pix[i], SIMPLIFY = F) %>% 
     do.call(rbind,.) %>% 
+    as_tibble() %>% 
     add_column(Day = day_group[i], Group="Ctrl", ID=str_c("m",1:9), .before = 'ratio')
   
   dat_anti_con[[i]]<- list.files(path_con,pattern = ".csv", full.names = T ) %>% 
     as.list() %>% 
     mapply(cc_anti_behavior, ., frame_rate = 10, length_pix=length_pix[i], SIMPLIFY = F) %>% 
     do.call(rbind,.) %>% 
+    as_tibble() %>% 
     add_column(Day = day_group[i], Group="Cond.", ID=str_c("m",1:10), .before = 'ratio')
 }
 
@@ -130,10 +132,68 @@ dat_anti_wt <- do.call(rbind, dat_anti_ctrl) %>%
   filter(Day!="Rm") %>% 
   pivot_longer(-c(Day, Group, ID), names_to = "variable", values_to = "value" , values_drop_na = TRUE) %>% 
   ddply(., .(ID, variable, Day, Group), summarise, 'value'= mean(value)) %>% 
-  mutate(Day=factor(Day, levels = c("Pre",  "Post")), Group=factor(Group, levels = c("Ctrl", "Cond.")))
+  mutate(Day=factor(Day, levels = c("Pre", "D4", "D5", "D6", "Post")), Group=factor(Group, levels = c("Ctrl", "Cond.")))
 
 dat_anti_wt_sta <- ddply(dat_anti_wt,.(variable,Day, Group), summarise,n=length(value),mean=mean(value),sd=sd(value),se=sd(value)/sqrt(length(value))) %>% 
   filter(Day=="Post")
+
+
+dat_ratio <- dat_anti_wt %>% 
+  filter(variable=="ratio" ) %>% 
+  mutate(value=value*100)
+
+p_ratio <- dat_anti_wt %>% 
+  filter(variable=="ratio" ) %>% 
+  mutate(value=value*100) %>% 
+  ddply(.,.(Day, Group), summarise, mean= mean(value), se=sd(value)/sqrt(length(value))) %>% 
+  ggplot(data = ., aes(x = Day, y = mean, color = Group))+
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.1) +
+  geom_point(aes(colour = Group, shape = Group),size=2)+
+  geom_line(aes(group = Group))+
+  geom_jitter(data= dat_ratio, aes(x= Day, y = value, color= Group, shape = Group), width = 0.2, alpha = 0.4)+
+  scale_shape_manual(values=c(20, 18))+
+  scale_color_manual(values=c("darkcyan", "indianred"))+
+  labs(x="", y="Time spend in chamber 2 (%)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  #scale_y_continuous(limits = c(0, 100), expand = c(0, 0))+
+  theme(legend.position = "none")
+
+dat_latency <- dat_anti_wt %>% 
+  filter(variable=="latency2" )
+
+p_latency2 <- dat_anti_wt %>% 
+  filter(variable=="latency2" ) %>% 
+  ddply(.,.(Day, Group), summarise, mean= mean(value), se=sd(value)/sqrt(length(value))) %>% 
+  ggplot(data = ., aes(x = Day, y = mean, color = Group))+
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=0.1) +
+  geom_point(aes(colour = Group, shape = Group),size=2)+
+  geom_line(aes(group = Group))+
+  geom_jitter(data= dat_latency, aes(x= Day, y = value, color= Group, shape = Group), width = 0.2, alpha = 0.4)+
+  scale_shape_manual(values=c(20, 18))+
+  scale_color_manual(values=c("darkcyan", "indianred"))+
+  labs(x="", y="Latency of crossing back (s)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  scale_y_continuous(limits = c(0, 220), expand = c(0, 0))+
+  theme(legend.position = "none")
+
+p_wt_pac <- plot_grid(p_ratio, p_latency2, nrow = 1)
+
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+cairo_pdf("p_wt_pac.pdf", width = 180/25.6, height = 60/25.6, family = "Arial")
+p_wt_pac
+dev.off()
 
 p_ratio <- dat_anti_wt %>% 
   filter(variable=="ratio" ) %>% 
@@ -176,7 +236,7 @@ p_latency2 <- dat_anti_wt %>%
   theme(legend.position = "none")
 
 p_pain_compare1 <- plot_grid(p_latency2, p_ratio, nrow = 1)
-setwd("~cchen2/Documents/neuroscience/Pn\ project/Figure/PDF/")
+setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
 cairo_pdf("p_pain_compare1.pdf", width = 95/25.6, height = 60/25.6, family = "Arial")
 p_pain_compare1
 dev.off()
