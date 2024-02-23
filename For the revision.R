@@ -2158,13 +2158,14 @@ p_latency2 <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis
   rename(Day= name) %>% 
   bind_rows(., dat_wt_cond_latency) %>% 
   mutate(Group = factor(Group, levels = c("Cond.","Saline", "Nalox"))) %>% 
+  filter(Group!= "Nalox") %>% 
   ggplot(., aes(interaction(Day, Group), value, fill= Day))+
   geom_boxplot( outlier.shape = NA)+
   geom_line(aes(group=interaction(ID, Group)), colour="gray90")+
   geom_point(aes(colour = Group,shape = Group),position=position_jitterdodge(jitter.width = .4))+
-  scale_fill_manual(values = c("white", "white", "white"))+
+  scale_fill_manual(values = c("white", "white"))+
   scale_shape_manual(values=c(16, 17, 18))+
-  scale_color_manual(values=c("indianred","darkorange", "deepskyblue3"))+
+  scale_color_manual(values=c("indianred","darkorange"))+
   labs(x="", y="Latency of crossing back (s)")+
   theme(axis.line.x = element_line(),
         axis.line.y = element_line(),
@@ -2205,13 +2206,14 @@ p_ratio <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/Fo
   bind_rows(., dat_wt_cond_ratio) %>% 
   mutate(Day = factor(Day, levels = c("Time_hot3", "Time_hot"))) %>% 
   mutate(Group = factor(Group, levels = c("Cond.","Saline", "Nalox"))) %>% 
+  filter(Group!= "Nalox") %>% 
   ggplot(., aes(interaction(Day, Group), value, fill= Day))+
   geom_boxplot( outlier.shape = NA)+
   geom_line(aes(group=interaction(ID, Group)), colour="gray90")+
   geom_point(aes(colour = Group,shape = Group),position=position_jitterdodge(jitter.width = .4))+
-  scale_fill_manual(values = c("white", "white", "white"))+
+  scale_fill_manual(values = c("white", "white"))+
   scale_shape_manual(values=c(16, 17, 18))+
-  scale_color_manual(values=c("indianred","darkorange", "deepskyblue3"))+
+  scale_color_manual(values=c("indianred","darkorange"))+
   labs(x="", y="Time spent in 2nd plate (%)")+
   theme(axis.line.x = element_line(),
         axis.line.y = element_line(),
@@ -2249,12 +2251,13 @@ p_licking <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/
   dplyr::select(Group, Latency) %>% 
   bind_rows(., dat_licking_wt) %>% 
   mutate(Group = factor(Group, levels = c("Cond.","Saline", "Nalox"))) %>% 
+  filter(Group!= "Nalox") %>% 
   ggplot(., aes(Group,Latency, fill=Group))+
   geom_boxplot(outlier.shape = NA)+
   geom_point(aes(colour = Group,shape = Group),position=position_jitterdodge(jitter.width = .4))+
-  scale_fill_manual(values = c("white", "white", "white"))+
+  scale_fill_manual(values = c("white", "white"))+
   scale_shape_manual(values=c(16, 17, 18))+
-  scale_color_manual(values=c("indianred","darkorange", "deepskyblue3"))+
+  scale_color_manual(values=c("indianred","darkorange"))+
   labs(x="", y="Latency to 1st licking (s)")+
   theme(axis.line.x = element_line(),
         axis.line.y = element_line(),
@@ -2280,6 +2283,14 @@ dat_licking_sta <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_ana
   bind_rows(., dat_licking_wt) %>% 
   ddply(.,.(Group), summarise, mean=mean(Latency), se=sd(Latency)/sqrt(length(Latency)))
 
+p_licking <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/For\ revision/Pn_revision.xlsx", sheet = 'PAC_nalox_cond') %>% 
+  select(Group, Latency_1st_crossing, First_licking) %>% 
+  mutate(Latency = (First_licking - Latency_1st_crossing)/10) %>% 
+  dplyr::select(Group, Latency) %>% 
+  bind_rows(., dat_licking_wt) %>% 
+  mutate(Group = factor(Group, levels = c("Cond.","Saline", "Nalox"))) %>% 
+  filter(Group!= "Nalox") %>% 
+  wilcox.test(Latency~Group,.)
 
 
 summary(t_licking)
@@ -2303,12 +2314,13 @@ p_rearing <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/
   dplyr::select(Group, Latency) %>% 
   bind_rows(., dat_rearing_wt) %>% 
   mutate(Group = factor(Group, levels = c("Cond.","Saline", "Nalox"))) %>% 
+  filter(Group!= "Nalox") %>% 
   ggplot(., aes(Group,Latency, fill=Group))+
   geom_boxplot(outlier.shape = NA)+
   geom_point(aes(colour = Group,shape = Group),position=position_jitterdodge(jitter.width = .4))+
-  scale_fill_manual(values = c("white", "white", "white"))+
+  scale_fill_manual(values = c("white", "white"))+
   scale_shape_manual(values=c(16, 17, 18))+
-  scale_color_manual(values=c("indianred","darkorange", "deepskyblue3"))+
+  scale_color_manual(values=c("indianred","darkorange"))+
   labs(x="", y="Latency to 1st rearing (s)")+
   theme(axis.line.x = element_line(),
         axis.line.y = element_line(),
@@ -2338,9 +2350,13 @@ dat_rearing_sta <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_ana
   ddply(.,.(Group), summarise, mean=mean(Latency), se=sd(Latency)/sqrt(length(Latency)))
 
 
-t_rearing <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/For\ revision/Pn_revision.xlsx", sheet = 'PAC_nalox_cond') %>% 
+p_rearing <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/For\ revision/Pn_revision.xlsx", sheet = 'PAC_nalox_cond') %>% 
   select(Group, Latency_1st_crossing, First_rearing) %>% 
   mutate(Latency = (First_rearing - Latency_1st_crossing)/10) %>% 
+  dplyr::select(Group, Latency) %>% 
+  bind_rows(., dat_rearing_wt) %>% 
+  mutate(Group = factor(Group, levels = c("Cond.","Saline", "Nalox"))) %>% 
+  filter(Group!= "Nalox")  %>% 
   wilcox.test(Latency~Group,.)
 
 dat_jumping_wt <- dat_wt_manual %>% 
@@ -2357,12 +2373,13 @@ p_jumping <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/
   dplyr::select(Group, Latency) %>% 
   bind_rows(., dat_jumping_wt) %>% 
   mutate(Group = factor(Group, levels = c("Cond.","Saline", "Nalox"))) %>% 
+  filter(Group!= "Nalox") %>% 
   ggplot(., aes(Group,Latency, fill=Group))+
   geom_boxplot(outlier.shape = NA)+
   geom_point(aes(colour = Group,shape = Group),position=position_jitterdodge(jitter.width = .4))+
-  scale_fill_manual(values = c("white", "white", "white"))+
+  scale_fill_manual(values = c("white", "white"))+
   scale_shape_manual(values=c(16, 17, 18))+
-  scale_color_manual(values=c("indianred","darkorange", "deepskyblue3"))+
+  scale_color_manual(values=c("indianred","darkorange"))+
   labs(x="", y="Latency to 1st jumping (s)")+
   theme(axis.line.x = element_line(),
         axis.line.y = element_line(),
@@ -2383,6 +2400,14 @@ t_jumping <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/
 summary(t_jumping)
 TukeyHSD(t_jumping) 
 
+t_jumping <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/For\ revision/Pn_revision.xlsx", sheet = 'PAC_nalox_cond') %>% 
+  select(Group, Latency_1st_crossing, Jumping) %>% 
+  mutate(Latency = (Jumping - Latency_1st_crossing)/10) %>% 
+  dplyr::select(Group, Latency) %>% 
+  bind_rows(., dat_jumping_wt) %>% 
+  mutate(Group = factor(Group, levels = c("Cond.","Saline", "Nalox"))) %>% 
+  filter(Group!= "Nalox") %>% 
+  wilcox.test(Latency~Group,.)
 
 dat_jumping_sta <- read.xlsx("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/For\ revision/Pn_revision.xlsx", sheet = 'PAC_nalox_cond') %>% 
   select(Group, Latency_1st_crossing, Jumping) %>% 
@@ -2396,7 +2421,7 @@ p_nalox_con2 <- plot_grid( p_licking, p_rearing, p_jumping, nrow = 1)
 
 
 setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
-cairo_pdf("p_nalox_con1.pdf", width = 100/25.6, height = 60/25.6, family = "Arial")
+cairo_pdf("p_nalox_con1.pdf", width = 80/25.6, height = 60/25.6, family = "Arial")
 p_nalox_con1
 dev.off()
 
@@ -3175,10 +3200,10 @@ dat_cell_trace_d <- dat_cell_trace_licking %>%
     
     ## heatmap plot the activity, ordered by cell activity
     comp_time <- seq(-2, 1.9, by=0.1)
-    group_day <- c("Pre","D4","D5", "D6")
+    group_day <- c("Pre","D5", "D6")
     score_range <- range(dat_cell_trace)
     
-    for(i in c(1:4)){
+    for(i in c(1:3)){
       cell_order <- lapply(dat_cell_trace, function(x)  x[[i]]) %>% 
         do.call(cbind,.) %>% 
         mutate(Time = comp_time) %>% 
@@ -3210,7 +3235,7 @@ dat_cell_trace_d <- dat_cell_trace_licking %>%
       
     }
     
-    p_heat <- plot_grid(p_heat_Pre ,p_heat_D4,p_heat_D5, p_heat_D6, nrow  = 1)
+    p_heat <- plot_grid(p_heat_Pre,p_heat_D5, p_heat_D6, nrow  = 1)
     
     setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
     cairo_pdf("p_heat.pdf", width = 140/25.6, height = 60/25.6, family = "Arial")
@@ -4636,3 +4661,218 @@ dat_cell_trace_d <- dat_cell_trace_licking %>%
     cairo_pdf("p_mini_compare.pdf", width = 60/25.6, height = 60/25.6, family = "Arial")
     p_mini_compare
     dev.off()
+
+    
+    ## correlation analysis for the rACC-Pn neuron activity-----
+    # run the script from 'Placebo_state_10012022.R'
+    c_miniscope_matlab_ft <- function(file_trace) {
+      ## import and format the data
+      dat_trace1 <- raveio::read_mat(file_trace)
+      ID <- str_extract(file_trace, regex("m\\d+"))
+      dat_trace1[[2]][1] <- ifelse(ID=="m857", 1694, dat_trace1[[2]][1])
+      num_compare <- c(4,7, 8)
+      t_crossing <- c(1,4, 5)
+      
+      cross_ID <- dat_trace1$global_map %>% 
+        as_tibble() %>% 
+        select(V1, V4, V5) %>% 
+        mutate_all(na_if, 0) %>% 
+        drop_na()
+      
+      dat_stim_trace <- vector(mode = "list", length = length(num_compare))
+      dat_cor_trace <- vector(mode = "list", length = length(num_compare))
+      
+      
+      for (i in seq_along(num_compare)) {
+        global_cell <- pull(cross_ID[,i])
+        dat_trace <- dat_trace1[[num_compare[i]]] %>% 
+          as_tibble() %>% 
+          select(all_of(global_cell)) %>% 
+          apply(., 2, scale)
+        
+        ## number of rows to be binned
+        n <- 2 # 0.05*2=0.1
+        t1_p <- dat_trace1$crossing[t_crossing[i]]
+        ## extract cell activity when they cross the border
+        #dat_stim1 <- dat_trace[(t1_p-40):(t1_p+140-1),] 
+        dat_stim1 <- dat_trace[(t1_p-40):(t1_p+40-1),] 
+        
+        dat_stim <- aggregate(dat_stim1,list(rep(1:(nrow(dat_stim1)%/%n+1),each=n,len=nrow(dat_stim1))),mean)[-1]
+        # apply(., 2, scale) %>% 
+        # as_tibble() %>% 
+        # replace(is.na(.), 0)
+        
+        
+        colnames(dat_stim) <- str_c(ID,"Cell", 1: ncol(dat_stim))
+        dat_stim_trace[[i]] <- dat_stim
+        
+        ## for correlation analysis 
+        
+        res_cor <- cor(dat_stim, method = "pearson")
+        res_cor[res_cor==1]<- NA
+        dat_cor_trace[[i]] <- res_cor
+      }
+      return(list(dat_stim_trace, dat_cor_trace))
+    }
+    
+    mouse_file <- as.list(list.files("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/FD-processed", full.names = T))
+    
+    dat_cell_trace <- mapply(c_miniscope_matlab_ft, mouse_file, SIMPLIFY = F)
+    
+    group_day <- c("Pre", "Cond", "Post")
+    
+    dat_cor_combine <- c()
+    for (i in seq_along(group_day)){
+      dat_cell_cor <- lapply(dat_cell_trace, function(x)  x[[2]]) %>% 
+        lapply(., function(x)  x[[i]]) %>% 
+        unlist() %>% 
+        .[!is.na(.)] %>% 
+        as_tibble() %>% 
+        add_column(Group = group_day[i])
+      
+      dat_cor_combine <- bind_rows(dat_cor_combine, dat_cell_cor)
+      
+    }
+    
+    dat_cor_pac <- dat_cor_combine %>% 
+      mutate(Group = factor(Group, levels = c("Pre", "Cond", "Post"))) %>% 
+      filter(Group != 'Cond') %>% 
+      ggplot(., aes(Group, value, cor = Group))+
+      geom_violin()+
+      geom_jitter(aes(colour = Group, shape = Group),width = 0.1,  size=2, alpha= 0.1)+
+      scale_color_manual(values=c("#8491B4FF",  "#3C5488FF"))+
+      labs(x="", y="C.C. of paired neurons")+
+      theme(axis.line.x = element_line(),
+            axis.line.y = element_line(),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            panel.border = element_blank(),
+            panel.background = element_blank(),
+            axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+      theme(legend.title = element_blank(), legend.position = "none")
+    
+    
+    t_cor_pac <- dat_cor_combine %>% 
+      aov(value~Group,.)
+    
+    summary(t_cor_pac)
+    
+    TukeyHSD(t_cor_pac)
+    
+    ## for frequency of ca2+ events---
+    c_miniscope_matlab_ft <- function(file_trace) {
+      ## import and format the data
+      dat_trace1 <- raveio::read_mat(file_trace)
+      ID <- str_extract(file_trace, regex("m\\d+"))
+      dat_trace1[[2]][1] <- ifelse(ID=="m857", 1694, dat_trace1[[2]][1])
+      num_compare <- c(4,7, 8)
+      t_crossing <- c(1,4, 5)
+      
+      cross_ID <- dat_trace1$global_map %>% 
+        as_tibble() %>% 
+        select(V1, V4, V5) %>% 
+        mutate_all(na_if, 0) %>% 
+        drop_na()
+      
+      ## for the spike frequency file
+      dat_spike <- list.files("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/Extract/Events_0.5/", pattern = ID, full.names = T)
+      
+      dat_stim_trace <- vector(mode = "list", length = length(num_compare))
+      dat_event_cor <- vector(mode = "list", length = length(num_compare))
+      
+      dat_event_day <- rep(0, 3)
+      
+      for (i in seq_along(num_compare)) {
+        global_cell <- pull(cross_ID[,i])
+        dat_trace <- dat_trace1[[num_compare[i]]] %>% 
+          as_tibble() %>% 
+          select(all_of(global_cell)) %>% 
+          apply(., 2, scale)
+        
+        dat_event <- read.xlsx(dat_spike[i], colNames = F) %>% 
+          as_tibble() %>% 
+          select(all_of(global_cell))
+        
+        ## number of rows to be binned
+        n <- 2 # 0.05*2=0.1
+        t1_p <- dat_trace1$crossing[t_crossing[i]]
+        ## extract cell activity when they cross the border
+        #dat_stim1 <- dat_trace[(t1_p-40):(t1_p+140-1),] 
+        dat_stim1 <- dat_trace[(t1_p-40):(t1_p+40-1),] 
+        
+        dat_stim <- aggregate(dat_stim1,list(rep(1:(nrow(dat_stim1)%/%n+1),each=n,len=nrow(dat_stim1))),mean)[-1]
+        # apply(., 2, scale) %>% 
+        # as_tibble() %>% 
+        # replace(is.na(.), 0)
+        
+        
+        colnames(dat_stim) <- str_c(ID,"Cell", 1: ncol(dat_stim))
+        dat_stim_trace[[i]] <- dat_stim
+        
+        ## calculate the event rate
+        dat_event1 <- dat_event[(t1_p-40):(t1_p+40-1),] %>% 
+          apply(., 2, mean) %>% 
+          mean()
+        
+        dat_event_day[i] <- dat_event1
+        
+        ## correlation analysis
+        res_cor <- cor(dat_stim, method = "pearson")
+        res_cor[res_cor==1]<- NA
+        dat_event_cor[[i]] <- res_cor
+        
+      }
+      return(dat_event_cor)
+    }
+    
+    
+    
+    ## analyze for all mouse 
+    mouse_file <- as.list(list.files("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/miniscope/FD-processed", full.names = T))
+    
+    dat_cell_trace <- mapply(c_miniscope_matlab_ft, mouse_file, SIMPLIFY = F)
+    
+    group_day <- c("Pre", "Cond", "Post")
+    
+    dat_event_cor_combine <- c()
+    for (i in seq_along(group_day)){
+      dat_cell_cor <- dat_cell_trace %>% 
+        lapply(., function(x)  x[[i]]) %>% 
+        unlist() %>% 
+        .[!is.na(.)] %>% 
+        as_tibble() %>% 
+        add_column(Group = group_day[i])
+      
+      dat_event_cor_combine <- bind_rows(dat_event_cor_combine, dat_cell_cor)
+      
+    }
+    
+    dat_cor_pac1 <- dat_event_cor_combine %>% 
+      mutate(Group = factor(Group, levels = c("Pre", "Cond", "Post"))) %>% 
+      filter(Group != 'Cond') %>% 
+      ggplot(., aes(Group, value, cor = Group))+
+      geom_violin()+
+      geom_jitter(aes(colour = Group, shape = Group),width = 0.1,  size=2, alpha= 0.2)+
+      scale_color_manual(values=c("#8491B4FF", "#3C5488FF"))+
+      labs(x="", y="C.C. of paired neurons")+
+      theme(axis.line.x = element_line(),
+            axis.line.y = element_line(),
+            panel.grid.major = element_blank(),
+            panel.grid.minor = element_blank(),
+            panel.border = element_blank(),
+            panel.background = element_blank(),
+            axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+      theme(legend.title = element_blank(), legend.position = "none")
+    
+    t_cor_pac <- dat_event_cor_combine %>% 
+      aov(value~Group,.)
+    
+    summary(t_cor_pac)
+    
+    TukeyHSD(t_cor_pac)
+    
+    setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
+    cairo_pdf("p_dat_cor_pac.pdf", width = 50/25.6, height = 60/25.6, family = "Arial")
+    dat_cor_pac1
+    dev.off()
+    

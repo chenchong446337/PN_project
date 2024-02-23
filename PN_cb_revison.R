@@ -1841,6 +1841,7 @@ fviz_nbclust(t(dat_cb_combine), kmeans, method = "silhouette")
 
 dat_cell_trace_cluster <- kmeans(t(dat_cb_combine), centers = 2, iter.max = 10)[[1]]
 
+fviz_cluster(dat_cell_trace_cluster, t(dat_cb_combine), geom = "point", ellipse.type = "convex", ggtheme = theme_bw())
 ## get the number of each neurons in the cluster 
 dat_cell_trace_cluster_num <- tibble(name = names(dat_cell_trace_cluster), cluster = dat_cell_trace_cluster) %>% 
   as_tibble() %>% 
@@ -2190,7 +2191,7 @@ dev.off()
 p_peak_amp <- dat_cb_combine_event %>% 
   mutate(cluster = map_dbl(name, ~dat_cell_trace_cluster[.x])) %>% 
   mutate(Group = factor(Group, levels = c("Pre", "Cond", "Post"))) %>% 
-  filter(value > 3) %>% 
+  #filter(value > 3) %>% 
   ggplot(., aes(Group, value, col = Group))+
   geom_boxplot(outlier.shape = NA)+
   geom_jitter(aes(colour = Group, shape = Group),width = 0.2,  size=2, alpha= 0.3)+
@@ -2207,6 +2208,81 @@ p_peak_amp <- dat_cb_combine_event %>%
   scale_y_continuous(limits = c(3, 15))+
   theme(legend.title = element_blank(), legend.position = "none")
   
+
+## for individual mice 
+p_peak_amp_mouse <- dat_cb_combine_event %>% 
+  mutate(cluster = map_dbl(name, ~dat_cell_trace_cluster[.x])) %>% 
+  mutate(Group = factor(Group, levels = c("Pre", "Cond", "Post"))) %>% 
+  filter(value > 3) %>% 
+  mutate(ID = str_extract(name, regex("m\\d+"))) %>% 
+  ddply(.,.(ID, Group, cluster), summarise, mean_amp = mean(value)) %>% 
+  ggplot(., aes(Group, mean_amp, col = Group))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_jitter(aes(colour = Group, shape = Group),width = 0.2,  size=2, alpha= 0.3)+
+  scale_color_manual(values=c("#8491B4FF", "#00A087FF", "#3C5488FF"))+
+  facet_grid(cols = vars(cluster))+
+  labs(x="", y="Peak amplitude (s.d)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  scale_y_continuous(limits = c(3, 15))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+## calculate the firing frequency of these events with larger amplitude 
+dat_cell_trace_cluster_num <- tibble(name = names(dat_cell_trace_cluster), cluster = dat_cell_trace_cluster) %>% 
+  as_tibble() %>% 
+  slice(rep(1:n(), each = 3)) %>% 
+  add_column(Group = rep(c("Pre", "Cond", "Post"), nrow(.)/3))
+
+p_peak_amp_frequency <- dat_cb_combine_event %>% 
+  mutate(cluster = map_dbl(name, ~dat_cell_trace_cluster[.x])) %>% 
+  filter(value > 3) %>% 
+  ddply(.,.(name, Group, cluster), summarise, n = length(value)) %>% 
+  mutate(Freq = n/4) %>% 
+  # merge(dat_cell_trace_cluster_num,., by = c("name", "cluster", "Group"), all.x = TRUE) %>% 
+  # select(name, Group, cluster, Freq) %>% 
+  # mutate(Freq = ifelse(is.na(Freq), 0, Freq)) %>% 
+  mutate(Group = factor(Group, levels = c("Pre", "Cond", "Post"))) %>% 
+  mutate(cluster = factor(cluster, levels = c(2,1))) %>% 
+  ggplot(., aes(Group, Freq, col = Group))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_jitter(aes(colour = Group, shape = Group),width = 0.2,  size=2, alpha= 0.3)+
+  scale_color_manual(values=c("#8491B4FF", "#00A087FF", "#3C5488FF"))+
+  facet_grid(cols = vars(cluster))+
+  labs(x="", y="Freq. of Ca2+ events (Hz)")+
+  theme(axis.line.x = element_line(),
+        axis.line.y = element_line(),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.border = element_blank(),
+        panel.background = element_blank(),
+        axis.title=element_text(family = "Arial",size = 12, face ="plain"))+
+  theme(legend.title = element_blank(), legend.position = "none")
+
+t_peak_amp_frequency <- dat_cb_combine_event %>% 
+  mutate(cluster = map_dbl(name, ~dat_cell_trace_cluster[.x])) %>% 
+  mutate(Group = factor(Group, levels = c("Pre", "Cond", "Post"))) %>% 
+  filter(value > 3) %>% 
+  ddply(.,.(name, Group, cluster), summarise, n = length(value)) %>% 
+  mutate(Freq = n/4) %>% 
+  # merge(dat_cell_trace_cluster_num,., by = c("name", "cluster", "Group"), all.x = TRUE) %>% 
+  # select(name, Group, cluster, Freq) %>% 
+  # mutate(Freq = ifelse(is.na(Freq), 0, Freq)) %>% 
+  mutate(Group = factor(Group, levels = c("Pre", "Cond", "Post"))) %>% 
+  filter(cluster==2) %>% 
+  filter(Group != "Post") %>% 
+  wilcox.test(Freq~Group,.)
+  
+
+
+  
+
+
+
 setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
 cairo_pdf("p_peak_amp.pdf", width = 80/25.6, height = 65/25.6, family = "Arial" )
 p_peak_amp

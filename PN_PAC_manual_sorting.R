@@ -534,9 +534,6 @@ c_miniscope_matlab_ft_time <- function(file_trace) {
     
     dat_stim <- dat_event[(t1_p-40):(t1_p+40-1),] 
     
-
-    
-    
     colnames(dat_stim) <- str_c(ID,"Cell", 1: ncol(dat_stim))
     dat_stim_trace[[i]] <- dat_stim
     
@@ -629,8 +626,8 @@ c_miniscope_matlab_ft <- function(file_trace) {
     ## extract cell activity when they cross the border
     #dat_stim1 <- dat_trace[(t1_p-40):(t1_p+140-1),] 
     t1_p <- ifelse(t1_p < 40, 40, t1_p)
-    dat_stim1 <- dat_event[(t1_p-40):(t1_p+40-1),] 
-    dat_stim <- aggregate(dat_stim1,list(rep(1:(nrow(dat_stim1)%/%n+1),each=n,len=nrow(dat_stim1))),mean)[-1]
+    dat_stim <- dat_event[(t1_p-40):(t1_p+40-1),] 
+    #dat_stim <- aggregate(dat_stim1,list(rep(1:(nrow(dat_stim1)%/%n+1),each=n,len=nrow(dat_stim1))),mean)[-1]
     
     
     
@@ -646,18 +643,28 @@ mouse_file <- as.list(list.files("~cchen/Documents/neuroscience/Pn\ project/Data
 
 dat_cell_trace <- mapply(c_miniscope_matlab_ft, mouse_file, SIMPLIFY = F)
 
-dat_spike <- dat_cell_trace[[5]][[1]] %>% 
+dat_spike <- dat_cell_trace[[3]][[1]]%>% 
   #do.call(rbind,.) %>% 
   as_tibble() %>% 
   select_if(~any(. != 0)) %>% 
   as.matrix() %>% 
-  cor() %>% 
+  cor(.,use = "complete.obs", method = "pearson") %>% 
   round(.,2) 
 
+# fviz_nbclust(dat_spike, kmeans, method = "silhouette")
 
-corrplot(dat_spike, method = "square",  order = "hclust",tl.col = "black", tl.srt = 45, tl.pos = "n",is.corr = FALSE)
+
+corrplot(dat_spike,title = "Correlation Plot", method = "square",  order="hclust",hclust.method = 'complete', outline = T, addgrid.col = "darkgray",tl.pos = "lt", rect.lwd = 2, cl.pos = "r",  is.corr = FALSE)
 
 
+# corrplot(dat_spike,title = "Correlation Plot", method = "square",  order="hclust",hclust.method = 'complete', outline = T, addgrid.col = "darkgray",tl.pos = "n", addrect = 4, rect.col = "black", rect.lwd = 2, cl.pos = "r",  is.corr = FALSE)
+
+dist_matrix <- as.dist(1 - dat_spike)
+# Perform hierarchical clustering
+hc <- hclust(dist_matrix, method = "average")  # You can choose other methods like 'complete', 'single', etc.
+
+k <- 5  # Number of clusters
+clusters <- cutree(hc, k)
 ## for ca2_ spike-----
 mouse_file <- as.list(list.files("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/For\ revision/PC_data5", full.names = T))
 
@@ -668,19 +675,19 @@ ID <- str_extract(file_trace, regex("m\\d+"))
 
 cell_bad <- which(dat_trace1$choices==0)
 
-cross_ID <- dat_trace1$global.map %>%
-  as_tibble() %>%
-  select(V1, V4, V5) %>%
-  mutate_all(na_if, 0) %>%
-  drop_na() %>%
-  filter(!V5 %in% cell_bad) %>%
-  pull(V1)
-
 # cross_ID <- dat_trace1$global.map %>%
 #   as_tibble() %>%
-#   select(V1) %>%
-#   filter(!V1 ==0) %>%
+#   select(V1, V4, V5) %>%
+#   mutate_all(na_if, 0) %>%
+#   drop_na() %>%
+#   filter(!V5 %in% cell_bad) %>%
 #   pull(V1)
+
+cross_ID <- dat_trace1$global.map %>%
+  as_tibble() %>%
+  select(V1) %>%
+  filter(!V1 ==0) %>%
+  pull(V1)
 
 dat_spike_time <- list.files("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/For\ revision/PC_spike_time5/", pattern = ID, full.names = T)
 
@@ -698,4 +705,6 @@ dat_trace_d1_res <- dat_event %>%
 
 #library(corrplot)
 corrplot(dat_trace_d1_res, method = "square",  order = "hclust",tl.col = "black", tl.srt = 45, tl.pos = "n",is.corr = FALSE)
+
+corrplot(dat_trace_d1_res,title = "Correlation Plot", method = "square",  order="hclust", hclust.method = 'complete',tl.pos = "n", addrect = 10, rect.col = "black", rect.lwd = 2, cl.pos = "r",  is.corr = FALSE)
 
