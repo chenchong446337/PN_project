@@ -284,7 +284,8 @@ for (i in 1: length(mouse_file)) {
 
 dat_global_cell_combine <- dat_global_cell %>% 
   do.call(rbind,.) %>% 
-  full_join(., dat_cell_trace_cluster_num, by = join_by(mouse_ID, cell_ID)) 
+  full_join(., dat_cell_trace_cluster_num, by = join_by(mouse_ID, cell_ID)) %>% 
+  filter(mouse_ID == "m676")
 
 write.csv(dat_global_cell_combine, "global_cell_cluster2.csv")
 

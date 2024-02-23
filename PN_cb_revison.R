@@ -1019,30 +1019,36 @@ for (i in 1: length(mouse_file)) {
 dat_global_cell_combine <- dat_global_cell %>% 
   do.call(rbind,.) %>% 
   full_join(., dat_cell_trace_cluster_num, by = join_by(mouse_ID, cell_ID)) %>% 
-  filter(mouse_ID == "m684")
+  filter(mouse_ID =="m687")
 
-## plot the trace of m676 from Pre, Cond and post
-dat_trace1 <- as.list(list.files("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/For\ revision/PC_data", full.names = T))[[4]] %>% 
+## plot the trace of m676 from Pre, Cond and post-----
+dat_trace1 <- as.list(list.files("~cchen/Documents/neuroscience/Pn\ project/Data_analysis/For\ revision/PC_data", full.names = T))[[6]] %>% 
   raveio::read_mat(.)
+
+back_crossing_frame <- c(1562, NA, 1562)
+last_crossing_frame <- c(2482, NA, 3640)
 
 day_compare <- c(1, 4, 5)
 for (i in seq_along(day_compare) ) {
   
   t1_p <- dat_trace1$crossing[day_compare[i]]
-  
-  plot_range <- c(1:1000)
+  t1_p_back <- back_crossing_frame[i]
+  t1_p_last <- last_crossing_frame[i]
+
+  plot_range <- c(1:3600)
   
   plot_cell_ID <- dat_global_cell_combine %>% 
-    arrange(cluster) %>% 
-    select(i) %>% 
+    dplyr::arrange(desc(cluster)) %>% 
+    #dplyr::arrange(cluster) %>% 
+    dplyr::select(i) %>% 
     pull() %>% 
-    .[1:12]
+    .[1:8]
 
 
   
   p_pc_trace <- dat_trace1[[3]][[day_compare[i]]] %>% 
     as_tibble() %>% 
-    select(all_of(plot_cell_ID)) %>% 
+    dplyr::select(all_of(plot_cell_ID)) %>% 
     apply(., 2, scale) %>% 
     as_tibble() %>% 
     slice(plot_range) %>% 
@@ -1056,7 +1062,12 @@ for (i in seq_along(day_compare) ) {
     theme_void()+
     theme(legend.position = "none")+
     theme(strip.text.y = element_blank()) +
-    annotate("rect", xmin = t1_p-40, xmax = t1_p + 40, ymin = -Inf, ymax = Inf, alpha = .2,fill = "blue")
+    annotate("rect", xmin = t1_p-40, xmax = t1_p + 40, ymin = -Inf, ymax = Inf, alpha = .2,fill = "blue")+
+    annotate("rect", xmin = t1_p_back-40, xmax = t1_p_back + 40, ymin = -Inf, ymax = Inf, alpha = .2,fill = "blue")+
+    annotate("rect", xmin = t1_p_last-40, xmax = t1_p_last + 40, ymin = -Inf, ymax = Inf, alpha = .2,fill = "blue")
+  
+  
+  
   
   assign(str_c("p_trace", day_compare[i]), p_pc_trace)
   
@@ -1065,10 +1076,6 @@ for (i in seq_along(day_compare) ) {
 
 
 p_trace <- plot_grid(p_trace1, p_trace4, p_trace5, nrow = 1)
-
-
-
-
 
 
 setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
@@ -2191,9 +2198,10 @@ dev.off()
 p_peak_amp <- dat_cb_combine_event %>% 
   mutate(cluster = map_dbl(name, ~dat_cell_trace_cluster[.x])) %>% 
   mutate(Group = factor(Group, levels = c("Pre", "Cond", "Post"))) %>% 
-  #filter(value > 3) %>% 
+  mutate(cluster = factor(cluster, levels = c(2,1))) %>% 
+  filter(value > 3) %>% 
   ggplot(., aes(Group, value, col = Group))+
-  geom_boxplot(outlier.shape = NA)+
+  geom_violin()+
   geom_jitter(aes(colour = Group, shape = Group),width = 0.2,  size=2, alpha= 0.3)+
   scale_color_manual(values=c("#8491B4FF", "#00A087FF", "#3C5488FF"))+
   facet_grid(cols = vars(cluster))+
@@ -2277,11 +2285,6 @@ t_peak_amp_frequency <- dat_cb_combine_event %>%
   filter(Group != "Post") %>% 
   wilcox.test(Freq~Group,.)
   
-
-
-  
-
-
 
 setwd("~cchen/Documents/neuroscience/Pn\ project/Figure/PDF/")
 cairo_pdf("p_peak_amp.pdf", width = 80/25.6, height = 65/25.6, family = "Arial" )
